@@ -396,7 +396,7 @@ class CurrentStepPlots(DjImportedFromDirectory):
         fi_curve = plot_fi_curve(features['all_stim_amp'], features['all_firing_rate'])
         key['fi_png_path'] = os.path.join(parent_directory, 'fi_png', rec + '.png')
         key['fi_svg_path'] = os.path.join(parent_directory, 'fi_svg', rec + '.svg')
-        fi_curve.savefig(os.path.join(self.directory, key['fi_png_path']))
+        fi_curve.savefig(os.path.join(self.directory, key['fi_png_path']), dpi=200)
         fi_curve.savefig(os.path.join(self.directory, key['fi_svg_path']))
         self.insert1(row=key)
 

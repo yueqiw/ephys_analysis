@@ -12,7 +12,7 @@ import stfio
 
 def load_current_step(abf_file, filetype='abf', channels=[0,1]):
     '''
-    Load current clamp recordings from pClamp .abf files 
+    Load current clamp recordings from pClamp .abf files
     '''
     ch0, ch1 = channels[0], channels[1]
     rec = stfio.read(abf_file)
@@ -236,6 +236,7 @@ def plot_fi_curve(stim_amp, firing_rate, save_filepath = None):
     fig.gca().spines['top'].set_visible(False)
     ax.set_ylabel('Spikes per second')
     ax.set_xlabel('Current injection (pA)')
+    fig.tight_layout()
     if save_filepath is not None:
-        fig.savefig(save_filepath)
+        fig.savefig(save_filepath, dpi=200)
     return fig

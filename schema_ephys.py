@@ -207,7 +207,8 @@ class CurrentStepTimeParams(dj.Manual):
     experiment: varchar(128)        # excel file names (experiment name)
     ---
     istep_start: float      # current injection starting time (s)
-    istep_end: float        # current injection ending time (s)
+    istep_end_1s: float     # time after 1st second (s) -- use the 1st second for analysis
+    istep_end: float        # current injection actual ending time (s)
     istep_duration: float   # current injection duration (s)
     """
 
@@ -219,6 +220,7 @@ class CurrentStepTimeParams(dj.Manual):
         entry_list = entry_list.dropna(how='any').to_dict('records')
         no_insert = True
         for entry in entry_list:
+            entry['istep_end_1s'] = entry['istep_start'] + 1
             entry['istep_end'] = entry['istep_start'] + entry['istep_duration']
             try:
                 self.insert1(row=entry)
@@ -245,6 +247,10 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
     capacitance = null : float
     input_resistance = null : float
     f_i_curve_slope = null : float
+    max_firing_rate = null : float
+
+    sag = null : float
+    vm_for_sag = null : float
 
     ap_threshold = null : float
     ap_width = null : float
@@ -256,24 +262,28 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
     ap_downstroke = null : float
     ap_updownstroke_ratio = null : float
 
-    rheobase_index = null : float
+    hs_firing_rate = null : float
+    hs_adaptation = null : float
+    hs_median_isi = null : float
+    hs_latency = null : float
+
+    rheobase_index = null : smallint
     rheobase_stim_amp = null : float
-
-    adaptation = null : float
-    avg_isi = null : float
-    latency = null : float
-
-    hero_sweep_index = null : float
+    hero_sweep_index = null : smallint
     hero_sweep_stim_amp = null : float
 
-    sag = null : float
-    vm_for_sag = null : float
+    all_firing_rate : longblob
+    all_stim_amp : longblob
+    all_adaptation : longblob
+    all_v_baseline : longblob
+    all_median_isi : longblob
+    all_first_isi : longblob
 
     """
     def _make_tuples(self, key):
-
+        # use the first second of current injection for analysis, regardless of the actual duration.
         istep_start, istep_end = \
-                (CurrentStepTimeParams() & key).fetch1('istep_start', 'istep_end')
+                (CurrentStepTimeParams() & key).fetch1('istep_start', 'istep_end_1s')
 
         this_organoid = (EphysExperimentsForAnalysis() & key)
         all_istep_recordings = (EphysRecordings()  & "protocol = 'istep'")
@@ -286,10 +296,13 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
             cell_features, summary_features = \
                         extract_istep_features(data, start=istep_start, end=istep_end, subthresh_min_amp=-50)
             newkey = summary_features.copy()
+
+
             newkey['has_ap'] = 'Yes' if summary_features['has_ap'] else 'No'
             newkey['experiment'] = key['experiment']
             newkey['cell'] = cell
             newkey['recording'] = rec
-            newkey.pop('file_id', None)
+            _ = newkey.pop('file_id', None)
+
             self.insert1(row=newkey)
         return

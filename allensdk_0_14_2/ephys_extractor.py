@@ -755,7 +755,7 @@ class EphysSweepSetFeatureExtractor:
         sweep_feature : nparray of sweep-level feature values
         """
         features = np.array([swp.sweep_feature(key, allow_missing) for swp in self._sweeps])
-        print([key, len(self._sweeps), features])
+        # print([key, len(self._sweeps), features]) # DEBUG
         return features
 
     def spike_feature_averages(self, key):
@@ -925,12 +925,12 @@ class EphysCellFeatureExtractor:
         for s in self._features["long_squares"]["subthreshold_sweeps"]:
             s.set_stimulus_amplitude_calculator(_step_stim_amp)
 
-        print("subthresh_sweeps", len(subthresh_sweeps)) # DEBUG
+        # print("subthresh_sweeps", len(subthresh_sweeps)) # DEBUG
         calc_subthresh_sweeps = [sweep for sweep in subthresh_sweeps if
                                  sweep.sweep_feature("stim_amp") < 0 and
                                  sweep.sweep_feature("stim_amp") > self._subthresh_min_amp]
 
-        print("calc_subthresh_sweeps", len(calc_subthresh_sweeps)) # DEBUG
+        # print("calc_subthresh_sweeps", len(calc_subthresh_sweeps)) # DEBUG
         calc_subthresh_ext = EphysSweepSetFeatureExtractor.from_sweeps(calc_subthresh_sweeps)
         self._subthreshold_membrane_property_ext = calc_subthresh_ext
         self._features["long_squares"]["subthreshold_membrane_property_sweeps"] = calc_subthresh_ext.sweeps()
@@ -1138,7 +1138,9 @@ def extractor_for_nwb_sweeps(dataset, sweep_numbers,
 
 
 def _step_stim_amp(sweep):
-    t_index = ft.find_time_index(sweep.t, sweep.start)
+    # t_index = ft.find_time_index(sweep.t, sweep.start)
+    # use time point 0.1 s after stim start. Sometimes the starting time is still at baseline
+    t_index = ft.find_time_index(sweep.t, sweep.start + 0.1)
     return sweep.i[t_index + 1] - sweep.sweep_feature('i_baseline')
 
 

@@ -1,19 +1,21 @@
-import os, sys
+import os
 import pandas as pd
 import numpy as np
-import stfio
-from pymysql import IntegrityError
 
-from collections import OrderedDict
-
-from current_clamp import load_current_step, plot_current_step, animate_current_step
+from current_clamp import load_current_step
+from current_clamp_features import extract_istep_features
 from read_metadata import *
 
-import allensdk_0_14_2.ephys_extractor as efex
-from allensdk_0_14_2.more_utils import extract_istep_features
-
+from pymysql import IntegrityError
 import datajoint as dj
 schema = dj.schema('yueqi_ephys', locals())
+
+
+class DjImportedFromDirectory(dj.Imported):
+    # Subclass of Imported. Initialize with data directory.
+    def __init__(self, directory=''):
+        self.directory = directory
+        super().__init__()
 
 
 @schema
@@ -42,13 +44,6 @@ class EphysExperimentsForAnalysis(dj.Manual):
         if no_insert:
             print("No new entry inserted.")
         return
-
-
-class DjImportedFromDirectory(dj.Imported):
-    # Subclass of Imported. Initialize with data directory.
-    def __init__(self, directory=''):
-        self.directory = directory
-        super().__init__()
 
 
 @schema

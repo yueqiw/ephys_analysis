@@ -1,13 +1,14 @@
 import os
-
 import numpy as np
+import pandas as pd
+import six
 from collections import OrderedDict
+
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from matplotlib import animation
 
 import stfio
-
 
 def load_current_step(abf_file, filetype='abf', channels=[0,1]):
     ch0, ch1 = channels[0], channels[1]

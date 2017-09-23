@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 
-from current_clamp import load_current_step
+from current_clamp import *
 from current_clamp_features import extract_istep_features
 from read_metadata import *
 
@@ -232,11 +232,30 @@ class CurrentStepTimeParams(dj.Manual):
             print("No new entry inserted.")
         return
 
+
+@schema
+class FeatureExtractionParams(dj.Lookup):
+    definition = """
+    # Parameters for AllenSDK action potential detection algorithm
+    params_id : int        # unique id for parameter set
+    ---
+    dv_cutoff = 10 : float          # minimum dV/dt to qualify as a spike in V/s (optional, default 20)
+    max_interval = 0.01 : float     # maximum acceptable time between start of spike and time of peak in sec (optional, default 0.005)
+    min_height = 10 : float         # minimum acceptable height from threshold to peak in mV (optional, default 2)
+    min_peak = -25 : float          # minimum acceptable absolute peak level in mV (optional, default -30)
+    thresh_frac = 0.05 : float      # fraction of average upstroke for threshold calculation (optional, default 0.05)
+    baseline_interval = 0.1 : float     # interval length for baseline voltage calculation (before start if start is defined, default 0.1)
+    baseline_detect_thresh = 0.3 : float    # dV/dt threshold for evaluating flatness of baseline region (optional, default 0.3)
+    subthresh_min_amp = -50 : float         # minimum subthreshold current, not related to spike detection.
+    """
+
+
 @schema
 class APandIntrinsicProperties(DjImportedFromDirectory):
     definition = """
     # Action potential and intrinsic properties from current injections
     -> EphysExperimentsForAnalysis
+    -> FeatureExtractionParams
     cell: varchar(128)      # cell id
     recording: varchar(128) # recording file name
     ---
@@ -279,22 +298,29 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
     all_median_isi : longblob
     all_first_isi : longblob
 
+    spikes_sweep_id : longblob
+    spikes_threshold_t : longblob
+
     """
     def _make_tuples(self, key):
         # use the first second of current injection for analysis, regardless of the actual duration.
-        istep_start, istep_end = \
+        istep_start, istep_end_1s = \
                 (CurrentStepTimeParams() & key).fetch1('istep_start', 'istep_end_1s')
 
         this_organoid = (EphysExperimentsForAnalysis() & key)
         all_istep_recordings = (EphysRecordings()  & "protocol = 'istep'")
         cells, istep_recordings = (all_istep_recordings * this_organoid).fetch('cell','recording')
 
+        params = (FeatureExtractionParams() & key).fetch1()
+        params_id = params.pop('params_id', None)
+
         for cell, rec in zip(cells, istep_recordings):
             print('Populating for: ' + key['experiment'] + ' ' + rec)
             abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
             data = load_current_step(abf_file)
             cell_features, summary_features = \
-                        extract_istep_features(data, start=istep_start, end=istep_end, subthresh_min_amp=-50)
+                        extract_istep_features(data, start=istep_start, end=istep_end_1s,
+                        **params)
             newkey = summary_features.copy()
 
 
@@ -302,7 +328,76 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
             newkey['experiment'] = key['experiment']
             newkey['cell'] = cell
             newkey['recording'] = rec
+            newkey['params_id'] = params_id
             _ = newkey.pop('file_id', None)
 
             self.insert1(row=newkey)
+        return
+
+
+@schema
+class CurrentStepPlots(DjImportedFromDirectory):
+    definition = """
+    # Plot current clamp raw sweeps + detected spikes. Save figures locally.
+    -> APandIntrinsicProperties
+    ---
+    gif_path : varchar(256)
+    pdf_path : varchar(256)
+    svg_path : varchar(256)
+    png_path : varchar(256)
+    fi_svg_path : varchar(256)
+    fi_png_path : varchar(256)
+    """
+
+    def _make_tuples(self, key):
+        rec = key['recording']
+        print('Populating for: ' + key['experiment'] + ' ' + rec)
+        abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
+        data = load_current_step(abf_file)
+
+        istep_start, istep_end = \
+                (CurrentStepTimeParams() & key).fetch1('istep_start', 'istep_end')
+
+        params = (FeatureExtractionParams() & key).fetch1()
+        params_id = params.pop('params_id', None)
+
+        parent_directory = os.path.join(self.directory, key['experiment'], 'pics_params-' + str(params_id))
+        if not os.path.exists(parent_directory):
+            os.mkdir(parent_directory)
+
+        # The fetched features only contain AP time points for the 1st second
+        # features = (APandIntrinsicProperties() & key).fetch1()
+        # recalculate APs using the entire current step
+        _ , features = \
+                    extract_istep_features(data, start=istep_start, end=istep_end,
+                    **params)
+
+        fig = plot_current_step(data, fig_height=6, startend=[istep_start, istep_end],
+                                offset=[0.2, 0.4], skip_sweep=1,
+                                blue_sweep=features['hero_sweep_index'],
+                                spikes_threshold_t = features['spikes_threshold_t'],
+                                spikes_sweep_id = features['spikes_sweep_id'],
+                                save=False)
+        for filetype in ['png', 'pdf', 'svg', 'gif', 'fi_svg', 'fi_png']:
+            target_folder = os.path.join(parent_directory, filetype)
+            if not os.path.exists(target_folder):
+                os.mkdir(target_folder)
+        for filetype in ['png', 'pdf', 'svg']:
+            target_folder = os.path.join(parent_directory, filetype)
+            key[filetype + '_path'] = os.path.join(target_folder, rec + '.' + filetype)
+            fig.savefig(key[filetype + '_path'])
+
+        key['gif_path'] = os.path.join(parent_directory, 'gif', rec + '.gif')
+        animate_current_step(data, fig_height=6, startend=[istep_start, istep_end], offset=[0.2, 0.4],
+                            spikes_threshold_t = features['spikes_threshold_t'],
+                            spikes_sweep_id = features['spikes_sweep_id'], save=True,
+                           save_filepath = key['gif_path'])
+
+        fi_curve = plot_fi_curve(features['all_stim_amp'], features['all_firing_rate'])
+        key['fi_png_path'] = os.path.join(parent_directory, 'fi_png', rec + '.png')
+        key['fi_svg_path'] = os.path.join(parent_directory, 'fi_svg', rec + '.svg')
+        fi_curve.savefig(key['fi_png_path'])
+        fi_curve.savefig(key['fi_svg_path'])
+        self.insert1(row=key)
+
         return

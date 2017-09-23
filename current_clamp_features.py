@@ -6,13 +6,31 @@ from allensdk_0_14_2 import ephys_extractor as efex
 from allensdk_0_14_2 import ephys_features as ft
 
 
-def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delta_mV = 10):
+def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delta_mV = 10,
+                            filter=10., dv_cutoff=10., max_interval=0.01, min_height=10.,
+                            min_peak=-25., thresh_frac=0.05, baseline_interval=0.1,
+                            baseline_detect_thresh=0.3):
+
+    '''
+    Compute the cellular ephys features from square pulse current injections.
+    
+    Note that some default params are different from AllenSDK.
+    dv_cutoff 20 -> 10 to catch slower APs in immature neurons.
+    max_interval 0.005 -> 0.01 to catch slower APs.
+    min_height 2 -> 10 to reduce false positive due to relaxed dv_cutoff
+    min_peak -30 -> -25
+    '''
+
     istep_ext = efex.EphysSweepSetFeatureExtractor(
                                 [data['t']]*data['n_sweeps'],
                                 data['voltage'],
                                 data['current'],
                                 start=start, end=end,
-                                dv_cutoff=20., thresh_frac=0.05,
+                                filter=filter, dv_cutoff=dv_cutoff,
+                                max_interval=max_interval, min_height=min_height,
+                                min_peak=min_peak, thresh_frac=thresh_frac,
+                                baseline_interval=baseline_interval,
+                                baseline_detect_thresh=baseline_detect_thresh,
                                 id_set=list(range(data['n_sweeps'])))
 
     # only extract long_sqaures features
@@ -71,7 +89,12 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
     cell_features['hero_sweep_index'] = cell_features['hero_sweep']['id'] if hero_sweep else None
     cell_features['first_spike'] = first_spike if has_AP else None
 
-
+    spikes_sweep_id = []
+    spikes_threshold_t = []
+    for swp in cell_features['spiking_sweeps']:
+        for spike in swp['spikes']:
+            spikes_threshold_t.append(spike['threshold_t'])
+            spikes_sweep_id.append(swp['id'])
 
 
     summary_features = OrderedDict([
@@ -116,7 +139,9 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
                         ('all_adaptation', np.array([swp.get('adapt', 0.0) for swp in cell_features['sweeps']])),
                         ('all_v_baseline', np.array([swp['v_baseline'] for swp in cell_features['sweeps']])),
                         ('all_median_isi', np.array([swp.get('median_isi', 0.0) for swp in cell_features['sweeps']])),
-                        ('all_first_isi', np.array([swp.get('first_isi', 0.0) for swp in cell_features['sweeps']]))
+                        ('all_first_isi', np.array([swp.get('first_isi', 0.0) for swp in cell_features['sweeps']])),
+                        ('spikes_sweep_id', np.array(spikes_sweep_id)),
+                        ('spikes_threshold_t', np.array(spikes_threshold_t))
 
     ])
 

@@ -361,9 +361,9 @@ class CurrentStepPlots(DjImportedFromDirectory):
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
 
-        parent_directory = os.path.join(self.directory, key['experiment'], 'pics_params-' + str(params_id))
-        if not os.path.exists(parent_directory):
-            os.mkdir(parent_directory)
+        parent_directory = os.path.join(key['experiment'], 'pics_params-' + str(params_id))
+        if not os.path.exists(os.path.join(self.directory, parent_directory)):
+            os.mkdir(os.path.join(self.directory, parent_directory))
 
         # The fetched features only contain AP time points for the 1st second
         # features = (APandIntrinsicProperties() & key).fetch1()
@@ -379,25 +379,25 @@ class CurrentStepPlots(DjImportedFromDirectory):
                                 spikes_sweep_id = features['spikes_sweep_id'],
                                 save=False)
         for filetype in ['png', 'pdf', 'svg', 'gif', 'fi_svg', 'fi_png']:
-            target_folder = os.path.join(parent_directory, filetype)
+            target_folder = os.path.join(self.directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
         for filetype in ['png', 'pdf', 'svg']:
             target_folder = os.path.join(parent_directory, filetype)
             key[filetype + '_path'] = os.path.join(target_folder, rec + '.' + filetype)
-            fig.savefig(key[filetype + '_path'])
+            fig.savefig(os.path.join(self.directory, key[filetype + '_path']))
 
         key['gif_path'] = os.path.join(parent_directory, 'gif', rec + '.gif')
         animate_current_step(data, fig_height=6, startend=[istep_start, istep_end], offset=[0.2, 0.4],
                             spikes_threshold_t = features['spikes_threshold_t'],
                             spikes_sweep_id = features['spikes_sweep_id'], save=True,
-                           save_filepath = key['gif_path'])
+                           save_filepath = os.path.join(self.directory, key['gif_path']))
 
         fi_curve = plot_fi_curve(features['all_stim_amp'], features['all_firing_rate'])
         key['fi_png_path'] = os.path.join(parent_directory, 'fi_png', rec + '.png')
         key['fi_svg_path'] = os.path.join(parent_directory, 'fi_svg', rec + '.svg')
-        fi_curve.savefig(key['fi_png_path'])
-        fi_curve.savefig(key['fi_svg_path'])
+        fi_curve.savefig(os.path.join(self.directory, key['fi_png_path']))
+        fi_curve.savefig(os.path.join(self.directory, key['fi_svg_path']))
         self.insert1(row=key)
 
         return

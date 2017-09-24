@@ -348,8 +348,6 @@ class CurrentStepPlots(DjImportedFromDirectory):
     pdf_path : varchar(256)
     svg_path : varchar(256)
     png_path : varchar(256)
-    fi_svg_path : varchar(256)
-    fi_png_path : varchar(256)
     """
 
     def _make_tuples(self, key):

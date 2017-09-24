@@ -52,7 +52,7 @@ def load_current_step(abf_file, filetype='abf', channels=[0,1]):
 
 def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, vlim=[-155,55], ilim=[-80,10],
+                        blue_sweep=None, vlim=[-155,55], ilim=[-80,100],
                         spikes_sweep_id = None, spikes_threshold_t = None,
                         skip_sweep=1, skip_point=10, save=False):
     '''
@@ -218,6 +218,7 @@ def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
     anim = animation.FuncAnimation(fig, animate, init_func=init_animation, frames=data['n_sweeps'])
     if save:
         if save_filepath is not None:
+            # use default dpi=100. Setting other dpi values will produce wierd-looking plots. 
             anim.save(save_filepath, writer='imagemagick', fps=2.5)
         else:
             anim.save(os.path.join(data['file_directory'], data['file_id']) + '.gif', writer='imagemagick', fps=2.5)

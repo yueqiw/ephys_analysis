@@ -3,8 +3,6 @@ import pandas as pd
 import numpy as np
 
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-mpl.rc("savefig", dpi=300)
 
 from current_clamp import *
 from current_clamp_features import extract_istep_features
@@ -399,6 +397,7 @@ class CurrentStepPlots(DjImportedFromDirectory):
                             spikes_sweep_id = features['spikes_sweep_id'], save=True,
                            save_filepath = os.path.join(self.directory, key['gif_path']))
         plt.close(anim)
+        self.insert1(row=key)
         return
 
 

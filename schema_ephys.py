@@ -515,7 +515,7 @@ class PhasePlanes(DjImportedFromDirectory):
         abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
         data = load_current_step(abf_file)
 
-        phase_plane = plot_phase_plane(data, features)
+        phase_plane = plot_phase_plane(data, features, filter=0.005)
         key['phase_png_path'] = os.path.join(parent_directory, 'phase_png', 'phase_' + rec + '.png')
         key['phase_svg_path'] = os.path.join(parent_directory, 'phase_svg', 'phase_' + rec + '.svg')
         phase_plane.savefig(os.path.join(self.directory, key['phase_png_path']), dpi=300)

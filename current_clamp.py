@@ -247,7 +247,7 @@ def plot_fi_curve(stim_amp, firing_rate, save_filepath = None):
     return fig
 
 
-def plot_first_spike(data, summary_features, time_zero='threshold',
+def plot_first_spike(data, features, time_zero='threshold',
                     window=None, vlim=[-80, 50], color=sns.color_palette("muted")[2],
                     save_filepath = None):
     '''
@@ -255,7 +255,7 @@ def plot_first_spike(data, summary_features, time_zero='threshold',
     Inputs
     -----
     data: raw data of sweeps loaded by load_current_step()
-    summary_features: dictionary from extract_istep_features()
+    features: dictionary from extract_istep_features()
     time_zero: whether to use threshold or peak time
     window: time range in ms. such as [t-10, t+40] ms
 
@@ -265,25 +265,25 @@ def plot_first_spike(data, summary_features, time_zero='threshold',
     '''
     assert(time_zero in ['threshold', 'peak'])
     if time_zero == 'threshold':
-        t0 = summary_features['spikes_threshold_t'][0]
+        t0 = features['spikes_threshold_t'][0]
         if window is None:
             window = [-10, 40]
     elif time_zero == 'peak':
-        t0 = summary_features['spikes_peak_t'][0]
+        t0 = features['spikes_peak_t'][0]
         if window is None:
             window = [-15, 35]
 
     ap_window = [t0 + x * 0.001 for x in window]
     start, end = [ft.find_time_index(data['t'], x) for x in ap_window]
     t = (data['t'][start:end] - data['t'][start]) * 1000 + window[0]
-    v = data['voltage'][summary_features['rheobase_index']][start:end]
+    v = data['voltage'][features['rheobase_index']][start:end]
 
     mpl.rcParams.update(mpl.rcParamsDefault)
     fig, ax = plt.subplots(1,1,figsize=(4,4))
     ax.plot(t, v, color=color)
 
-    threshold_time = (summary_features['spikes_threshold_t'][0] - t0) * 1000
-    ax.hlines(summary_features['ap_threshold'], window[0], threshold_time,
+    threshold_time = (features['spikes_threshold_t'][0] - t0) * 1000
+    ax.hlines(features['ap_threshold'], window[0], threshold_time,
                 linestyles='dotted', color='grey')
 
     ax.set_ylim(vlim)
@@ -298,15 +298,20 @@ def plot_first_spike(data, summary_features, time_zero='threshold',
     return fig
 
 
-def plot_phase_plane(data, summary_features, filter=None, window=[-10, 40],
-                        vlim=[-80, 50], dvdtlim=[-80, 320],
+def plot_phase_plane(data, features, filter=None, window=[-50, 200],
+                        vlim=[-85, 50], dvdtlim=[-80, 320],
                         color=sns.color_palette("muted")[1],
                         save_filepath=None):
-    t0 = summary_features['spikes_threshold_t'][0]
+    t0 = features['spikes_threshold_t'][0]
     ap_window = [t0 + x * 0.001 for x in window]
+
+    if len(features['spikes_sweep_id']) > 1 and \
+        features['spikes_sweep_id'][1] == features['spikes_sweep_id'][0]:
+            ap_window[1] = min(ap_window[1], features['spikes_threshold_t'][1])
+
     start, end = [ft.find_time_index(data['t'], x) for x in ap_window]
     t = (data['t'][start:end] - data['t'][start]) * 1000 + window[0]
-    v = data['voltage'][summary_features['rheobase_index']][start:end]
+    v = data['voltage'][features['rheobase_index']][start:end]
     dvdt = ft.calculate_dvdt(v, t, filter=filter) * 1000
 
     mpl.rcParams.update(mpl.rcParamsDefault)

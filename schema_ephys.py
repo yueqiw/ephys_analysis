@@ -303,6 +303,7 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
 
     spikes_sweep_id : longblob
     spikes_threshold_t : longblob
+    spikes_peak_t: longblob
 
     """
     def _make_tuples(self, key):
@@ -376,10 +377,11 @@ class CurrentStepPlots(DjImportedFromDirectory):
         fig = plot_current_step(data, fig_height=6, startend=[istep_start, istep_end],
                                 offset=[0.2, 0.4], skip_sweep=1,
                                 blue_sweep=features['hero_sweep_index'],
-                                spikes_threshold_t = features['spikes_threshold_t'],
+                                spikes_t = features['spikes_peak_t'],
                                 spikes_sweep_id = features['spikes_sweep_id'],
+                                bias_current = features['bias_current'],
                                 save=False)
-        for filetype in ['png', 'pdf', 'svg', 'gif', 'fi_svg', 'fi_png']:
+        for filetype in ['png', 'pdf', 'svg', 'gif']:
             target_folder = os.path.join(self.directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
@@ -391,9 +393,11 @@ class CurrentStepPlots(DjImportedFromDirectory):
 
         key['gif_path'] = os.path.join(parent_directory, 'gif', rec + '.gif')
         anim = animate_current_step(data, fig_height=6, startend=[istep_start, istep_end], offset=[0.2, 0.4],
-                            spikes_threshold_t = features['spikes_threshold_t'],
-                            spikes_sweep_id = features['spikes_sweep_id'], save=True,
-                           save_filepath = os.path.join(self.directory, key['gif_path']))
+                            spikes_t = features['spikes_peak_t'],
+                            spikes_sweep_id = features['spikes_sweep_id'],
+                            bias_current = features['bias_current'],
+                            save=True,
+                            save_filepath = os.path.join(self.directory, key['gif_path']))
         plt.close(anim)
         self.insert1(row=key)
         return
@@ -405,10 +409,15 @@ class FICurvePlots(DjImportedFromDirectory):
     # Plot F-I curve from current clamp recordings. Save figures locally. Store file path.
     -> APandIntrinsicProperties
     ---
-    fi_svg_path : varchar(256)
-    fi_png_path : varchar(256)
+    fi_svg_path = null : varchar(256)
+    fi_png_path = null : varchar(256)
     """
     def _make_tuples(self, key):
+        features = (APandIntrinsicProperties() & key).fetch1()
+        if features['has_ap'] == 'No':
+            self.insert1(row=key)
+            return
+
         rec = key['recording']
         print('Populating for: ' + key['experiment'] + ' ' + rec)
         params = (FeatureExtractionParams() & key).fetch1()
@@ -416,15 +425,101 @@ class FICurvePlots(DjImportedFromDirectory):
         parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
         if not os.path.exists(os.path.join(self.directory, parent_directory)):
             os.mkdir(os.path.join(self.directory, parent_directory))
+        for filetype in ['fi_png', 'fi_svg']:
+            target_folder = os.path.join(self.directory, parent_directory, filetype)
+            if not os.path.exists(target_folder):
+                os.mkdir(target_folder)
         # The fetched features only contain AP time points for the 1st second
         # Only use the 1st second for consistency
-        features = (APandIntrinsicProperties() & key).fetch1()
+
 
         fi_curve = plot_fi_curve(features['all_stim_amp'], features['all_firing_rate'])
-        key['fi_png_path'] = os.path.join(parent_directory, 'fi_png', rec + '.png')
-        key['fi_svg_path'] = os.path.join(parent_directory, 'fi_svg', rec + '.svg')
+        key['fi_png_path'] = os.path.join(parent_directory, 'fi_png', 'fi_' + rec + '.png')
+        key['fi_svg_path'] = os.path.join(parent_directory, 'fi_svg', 'fi_' + rec + '.svg')
         fi_curve.savefig(os.path.join(self.directory, key['fi_png_path']), dpi=300)
         fi_curve.savefig(os.path.join(self.directory, key['fi_svg_path']))
+        plt.show()
+        self.insert1(row=key)
+        return
+
+
+@schema
+class FirstSpikePlots(DjImportedFromDirectory):
+    definition = """
+    # Plot first spikes from current clamp recordings. Save figures locally. Store file path.
+    -> APandIntrinsicProperties
+    ---
+    spike_svg_path = null : varchar(256)
+    spike_png_path = null : varchar(256)
+    """
+    def _make_tuples(self, key):
+        features = (APandIntrinsicProperties() & key).fetch1()
+        if features['has_ap'] == 'No':
+            self.insert1(row=key)
+            return
+
+        rec = key['recording']
+        print('Populating for: ' + key['experiment'] + ' ' + rec)
+        params = (FeatureExtractionParams() & key).fetch1()
+        params_id = params.pop('params_id', None)
+        parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
+        if not os.path.exists(os.path.join(self.directory, parent_directory)):
+            os.mkdir(os.path.join(self.directory, parent_directory))
+        for filetype in ['spike_png', 'spike_svg']:
+            target_folder = os.path.join(self.directory, parent_directory, filetype)
+            if not os.path.exists(target_folder):
+                os.mkdir(target_folder)
+        # The fetched features only contain AP time points for the 1st second
+        # Only use the 1st second for consistency
+        abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
+        data = load_current_step(abf_file)
+
+        first_spike = plot_first_spike(data, features, time_zero='threshold')
+        key['spike_png_path'] = os.path.join(parent_directory, 'spike_png', 'spike_' + rec + '.png')
+        key['spike_svg_path'] = os.path.join(parent_directory, 'spike_svg', 'spike_' + rec + '.svg')
+        first_spike.savefig(os.path.join(self.directory, key['spike_png_path']), dpi=300)
+        first_spike.savefig(os.path.join(self.directory, key['spike_svg_path']))
+        plt.show()
+        self.insert1(row=key)
+        return
+
+
+@schema
+class PhasePlanes(DjImportedFromDirectory):
+    definition = """
+    # Plot phase planes of first spikes. Save figures locally. Store file path.
+    -> APandIntrinsicProperties
+    ---
+    phase_svg_path = null : varchar(256)
+    phase_png_path = null : varchar(256)
+    """
+    def _make_tuples(self, key):
+        features = (APandIntrinsicProperties() & key).fetch1()
+        if features['has_ap'] == 'No':
+            self.insert1(row=key)
+            return
+
+        rec = key['recording']
+        print('Populating for: ' + key['experiment'] + ' ' + rec)
+        params = (FeatureExtractionParams() & key).fetch1()
+        params_id = params.pop('params_id', None)
+        parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
+        if not os.path.exists(os.path.join(self.directory, parent_directory)):
+            os.mkdir(os.path.join(self.directory, parent_directory))
+        for filetype in ['phase_png', 'phase_svg']:
+            target_folder = os.path.join(self.directory, parent_directory, filetype)
+            if not os.path.exists(target_folder):
+                os.mkdir(target_folder)
+        # The fetched features only contain AP time points for the 1st second
+        # Only use the 1st second for consistency
+        abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
+        data = load_current_step(abf_file)
+
+        phase_plane = plot_phase_plane(data, features)
+        key['phase_png_path'] = os.path.join(parent_directory, 'phase_png', 'phase_' + rec + '.png')
+        key['phase_svg_path'] = os.path.join(parent_directory, 'phase_svg', 'phase_' + rec + '.svg')
+        phase_plane.savefig(os.path.join(self.directory, key['phase_png_path']), dpi=300)
+        phase_plane.savefig(os.path.join(self.directory, key['phase_svg_path']))
         plt.show()
         self.insert1(row=key)
         return

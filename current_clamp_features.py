@@ -7,8 +7,8 @@ from allensdk_0_14_2 import ephys_features as ft
 
 
 def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delta_mV = 10,
-                            filter=10., dv_cutoff=10., max_interval=0.01, min_height=10.,
-                            min_peak=-25., thresh_frac=0.05, baseline_interval=0.1,
+                            filter=10., dv_cutoff=10., max_interval=0.01, min_height=5.,
+                            min_peak=-30., thresh_frac=0.05, baseline_interval=0.1,
                             baseline_detect_thresh=0.3):
 
     '''
@@ -91,10 +91,12 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
 
     spikes_sweep_id = []
     spikes_threshold_t = []
+    spikes_peak_t = []
     for swp in cell_features['spiking_sweeps']:
         for spike in swp['spikes']:
             spikes_threshold_t.append(spike['threshold_t'])
             spikes_sweep_id.append(swp['id'])
+            spikes_peak_t.append(spike['peak_t'])
 
 
     summary_features = OrderedDict([
@@ -142,7 +144,8 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
                         ('all_first_isi', np.array([swp.get('first_isi', np.nan) for swp in cell_features['sweeps']])),
                         ('all_latency', np.array([swp.get('latency', np.nan) for swp in cell_features['sweeps']])),
                         ('spikes_sweep_id', np.array(spikes_sweep_id)),
-                        ('spikes_threshold_t', np.array(spikes_threshold_t))
+                        ('spikes_threshold_t', np.array(spikes_threshold_t)),
+                        ('spikes_peak_t', np.array(spikes_peak_t))
 
     ])
 

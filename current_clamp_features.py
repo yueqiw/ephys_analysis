@@ -13,7 +13,7 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
 
     '''
     Compute the cellular ephys features from square pulse current injections.
-    
+
     Note that some default params are different from AllenSDK.
     dv_cutoff 20 -> 10 to catch slower APs in immature neurons.
     max_interval 0.005 -> 0.01 to catch slower APs.
@@ -136,10 +136,11 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
 
                         ('all_firing_rate', np.array([swp['avg_rate'] for swp in cell_features['sweeps']])),
                         ('all_stim_amp', np.array([swp['stim_amp'] for swp in cell_features['sweeps']])),
-                        ('all_adaptation', np.array([swp.get('adapt', 0.0) for swp in cell_features['sweeps']])),
+                        ('all_adaptation', np.array([swp.get('adapt', np.nan) for swp in cell_features['sweeps']])),
                         ('all_v_baseline', np.array([swp['v_baseline'] for swp in cell_features['sweeps']])),
-                        ('all_median_isi', np.array([swp.get('median_isi', 0.0) for swp in cell_features['sweeps']])),
-                        ('all_first_isi', np.array([swp.get('first_isi', 0.0) for swp in cell_features['sweeps']])),
+                        ('all_median_isi', np.array([swp.get('median_isi', np.nan) for swp in cell_features['sweeps']])),
+                        ('all_first_isi', np.array([swp.get('first_isi', np.nan) for swp in cell_features['sweeps']])),
+                        ('all_latency', np.array([swp.get('latency', np.nan) for swp in cell_features['sweeps']])),
                         ('spikes_sweep_id', np.array(spikes_sweep_id)),
                         ('spikes_threshold_t', np.array(spikes_threshold_t))
 

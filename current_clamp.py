@@ -52,7 +52,7 @@ def load_current_step(abf_file, filetype='abf', channels=[0,1]):
 
 def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, vlim=[-155,55], ilim=[-70,70],
+                        blue_sweep=None, vlim=[-155,55], ilim=[-80,10],
                         spikes_sweep_id = None, spikes_threshold_t = None,
                         skip_sweep=1, skip_point=10, save=False):
     '''
@@ -135,7 +135,7 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
 
     plt.tight_layout()
     if save is True:
-        plt.savefig(os.path.join(data['file_directory'], data['file_id']) + '.png')
+        plt.savefig(os.path.join(data['file_directory'], data['file_id']) + '.png', dpi=300)
         plt.savefig(os.path.join(data['file_directory'], data['file_id']) + '.svg')
         plt.savefig(os.path.join(data['file_directory'], data['file_id']) + '.pdf')
 
@@ -144,7 +144,7 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
 
 def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, vlim=[-155,55], ilim=[-70,70],
+                        blue_sweep=None, vlim=[-155,55], ilim=[-80,100],
                         spikes_sweep_id = None, spikes_threshold_t = None,
                         skip_point=10, save=False, save_filepath=None):
     '''
@@ -221,7 +221,7 @@ def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
             anim.save(save_filepath, writer='imagemagick', fps=2.5)
         else:
             anim.save(os.path.join(data['file_directory'], data['file_id']) + '.gif', writer='imagemagick', fps=2.5)
-    return anim
+    return fig
 
 
 
@@ -238,5 +238,5 @@ def plot_fi_curve(stim_amp, firing_rate, save_filepath = None):
     ax.set_xlabel('Current injection (pA)')
     fig.tight_layout()
     if save_filepath is not None:
-        fig.savefig(save_filepath, dpi=200)
+        fig.savefig(save_filepath, dpi=300)
     return fig

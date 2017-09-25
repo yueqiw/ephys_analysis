@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 import matplotlib.pyplot as plt
+from PIL import Image
 
 from current_clamp import *
 from current_clamp_features import extract_istep_features
@@ -521,5 +522,57 @@ class PhasePlanes(DjImportedFromDirectory):
         phase_plane.savefig(os.path.join(self.directory, key['phase_png_path']), dpi=300)
         phase_plane.savefig(os.path.join(self.directory, key['phase_svg_path']))
         plt.show()
+        self.insert1(row=key)
+        return
+
+
+@schema
+class CombinedPlots(DjImportedFromDirectory):
+    definition = """
+    # Combine F-I, first spike, phase plane and current step plots together.
+    -> CurrentStepPlots
+    -> FICurvePlots
+    -> FirstSpikePlots
+    -> PhasePlanes
+    ---
+    fi_spike_phase_small = null : varchar(256)
+    fi_spike_phase_istep_small = null : varchar(256)
+    fi_spike_phase_mid = null : varchar(256)
+    fi_spike_phase_istep_mid = null : varchar(256)
+    fi_spike_phase_large = null : varchar(256)
+    fi_spike_phase_istep_large = null : varchar(256)
+    """
+
+    def _make_tuples(self, key):
+        fi = (FICurvePlots() & key).fetch1('fi_png_path')
+        spike = (FirstSpikePlots() & key).fetch1('spike_png_path')
+        phase = (PhasePlanes() & key).fetch1('phase_png_path')
+        istep = (CurrentStepPlots() & key).fetch1('png_path')
+        if not (fi and spike and phase and istep):
+            self.insert1(row=key)
+            return
+
+        rec = key['recording']
+        print('Populating for: ' + key['experiment'] + ' ' + rec)
+        params = (FeatureExtractionParams() & key).fetch1()
+        params_id = params.pop('params_id', None)
+        parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
+
+        left_large = combine_vertical([Image.open(os.path.join(self.directory, x)) for x in [fi, spike, phase]], scale=1)
+        left_mid = left_large.resize([int(x * 0.5) for x in left_large.size], resample=Image.BICUBIC)
+        left_small = left_large.resize([int(x * 0.2) for x in left_large.size], resample=Image.BICUBIC)
+        all_large = combine_horizontal([left_large, Image.open(os.path.join(self.directory, istep))], scale=1)
+        all_mid = all_large.resize([int(x * 0.5) for x in all_large.size], resample=Image.BICUBIC)
+        all_small = all_large.resize([int(x * 0.2) for x in all_large.size], resample=Image.BICUBIC)
+
+        for fpath , img in zip(['fi_spike_phase_large', 'fi_spike_phase_mid', 'fi_spike_phase_small',
+                            'fi_spike_phase_istep_large', 'fi_spike_phase_istep_mid', 'fi_spike_phase_istep_small'],
+                            [left_large, left_mid, left_small, all_large, all_mid, all_small]):
+            target_folder = os.path.join(self.directory, parent_directory, fpath)
+            if not os.path.exists(target_folder):
+                os.mkdir(target_folder)
+            key[fpath] = os.path.join(parent_directory, fpath, fpath + '_' + rec + '.png')
+
+            img.save(os.path.join(self.directory, key[fpath]))
         self.insert1(row=key)
         return

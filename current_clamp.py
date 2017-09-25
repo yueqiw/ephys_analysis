@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 from matplotlib import gridspec, animation
+from PIL import Image
 
 import allensdk_0_14_2.ephys_features as ft
 
@@ -235,12 +236,12 @@ def plot_fi_curve(stim_amp, firing_rate, save_filepath = None):
     Plot F-I curve
     '''
     mpl.rcParams.update(mpl.rcParamsDefault)
-    fig, ax = plt.subplots(1,1,figsize=(4,3))
+    fig, ax = plt.subplots(1,1,figsize=(4,4))
     ax.plot(stim_amp, firing_rate, marker='o', linewidth=1.5, markersize=8)
     fig.gca().spines['right'].set_visible(False)
     fig.gca().spines['top'].set_visible(False)
-    ax.set_ylabel('Spikes per second')
-    ax.set_xlabel('Current injection (pA)')
+    ax.set_ylabel('Spikes per second', fontsize=14)
+    ax.set_xlabel('Current (pA)', fontsize=14)
     fig.tight_layout()
     if save_filepath is not None:
         fig.savefig(save_filepath, dpi=300)
@@ -289,8 +290,8 @@ def plot_first_spike(data, features, time_zero='threshold',
     ax.set_ylim(vlim)
     fig.gca().spines['right'].set_visible(False)
     fig.gca().spines['top'].set_visible(False)
-    ax.set_ylabel('Membrane voltage (mV)')
-    ax.set_xlabel('Time (ms)')
+    ax.set_ylabel('Voltage (mV)', fontsize=14)
+    ax.set_xlabel('Time (ms)', fontsize=14)
     fig.tight_layout()
 
     if save_filepath is not None:
@@ -322,10 +323,60 @@ def plot_phase_plane(data, features, filter=None, window=[-50, 200],
     ax.set_ylim(dvdtlim)
     fig.gca().spines['right'].set_visible(False)
     fig.gca().spines['top'].set_visible(False)
-    ax.set_xlabel('Membrane voltage (mV)')
-    ax.set_ylabel('dV/dt (V/s)')
+    ax.set_xlabel('Voltage (mV)', fontsize=14)
+    ax.set_ylabel('dV/dt (V/s)', fontsize=14)
     fig.tight_layout()
 
     if save_filepath is not None:
         fig.savefig(save_filepath, dpi=300)
     return fig
+
+
+def combine_vertical(images, scale = 1):
+    # combine multiple PIL images
+    # roughtly same width
+    height = sum([x.size[1] for x in images])
+    width = max([x.size[0] for x in images])
+    combined = Image.new('RGB', (width, height), (255,255,255))
+
+    y_offset = 0
+    for im in images:
+        if len(im.split()) > 3:
+            combined.paste(im, (0, y_offset), mask=im.split()[3])
+        else:
+            combined.paste(im, (0, y_offset))
+        y_offset += im.size[1]
+    if scale != 1:
+        combined = combined.resize([int(x * scale) for x in combined.size], resample=Image.BICUBIC)
+    return combined
+
+
+def combine_horizontal(images, scale = 1, same_size = False):
+    # combine multiple PIL images
+    if not same_size:
+        min_height = min([x.size[1] for x in images])
+        min_i = np.argmin([x.size[1] for x in images])
+        scales = [min_height / x.size[1] for i, x in enumerate(images)]
+        resized = images.copy()
+
+        for i in range(len(resized)):
+            if i != min_i:
+                resized[i] = resized[i].resize([int(x * scales[i]) for x in resized[i].size], resample=Image.BICUBIC)
+    else:
+        resized = images
+
+    width = sum([x.size[0] for x in resized])
+    height = max([x.size[1] for x in resized])
+    combined = Image.new('RGB', (width, height), (255,255,255))
+
+    x_offset = 0
+    for im in resized:
+        if len(im.split()) > 3:
+            combined.paste(im, (x_offset,0), mask=im.split()[3])
+        else:
+            combined.paste(im, (x_offset,0))
+        x_offset += im.size[0]
+    if scale != 1:
+        combined = combined.resize([int(x * scale) for x in combined.size], resample=Image.BICUBIC)
+
+    return combined

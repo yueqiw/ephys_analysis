@@ -902,7 +902,7 @@ class EphysCellFeatureExtractor:
         self._spiking_long_squares_ext = EphysSweepSetFeatureExtractor.from_sweeps(spiking_sweeps)
         self._features["long_squares"]["spiking_sweeps"] = self._spiking_long_squares_ext.sweeps()
 
-        self._features["long_squares"]["fi_fit_slope"] = fit_fi_slope(self._spiking_long_squares_ext)
+        self._features["long_squares"]["fi_fit_slope"] = fit_fi_slope(self._spiking_long_squares_ext, amps[rheobase_index-1])
 
 
     def _analyze_long_squares_subthreshold(self):
@@ -1039,14 +1039,25 @@ def membrane_time_constant(ext):
     return avg_tau
 
 
-def fit_fi_slope(ext):
+def fit_fi_slope(ext, last_subthres_stim_amp):
     """Fit the rate and stimulus amplitude to a line and return the slope of the fit."""
     if len(ext.sweeps()) < 2:
-        print("Cannot fit f-I curve slope with less than two suprathreshold sweeps")
-        return None
+        print("Cannot acurately fit f-I curve slope with less than two suprathreshold sweeps.\n Fit anyway.")
 
+    # insert the last subthreshold sweep to the beginning of x and y
     x = np.array(list(map(_step_stim_amp, ext.sweeps())))
-    y = ext.sweep_features("avg_rate")
+    x = np.concatenate([np.array([last_subthres_stim_amp]), x])
+    y = np.concatenate([np.zeros(1), ext.sweep_features("avg_rate")])
+
+    # only fit the monotonically increasing part of the f-i curve
+    # sometimees too much current injection stops the cell from firing.
+    for i in range(1,len(y)):
+        if y[i] <= y[i-1]:
+            i -= 1
+            break
+    y = y[:i+1]
+    x = x[:i+1]
+    print(x)
 
     A = np.vstack([x, np.ones_like(x)]).T
     m, c = np.linalg.lstsq(A, y)[0]

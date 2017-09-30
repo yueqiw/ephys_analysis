@@ -20,7 +20,9 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
     min_height 2 -> 10 to reduce false positive due to relaxed dv_cutoff
     min_peak -30 -> -25
     '''
-
+    if filter * 1000 >= data['hz']:
+        filter = None
+        
     istep_ext = efex.EphysSweepSetFeatureExtractor(
                                 [data['t']]*data['n_sweeps'],
                                 data['voltage'],

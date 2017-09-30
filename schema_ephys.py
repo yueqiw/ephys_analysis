@@ -225,6 +225,8 @@ class CurrentStepTimeParams(dj.Manual):
         for entry in entry_list:
             entry['istep_end_1s'] = entry['istep_start'] + 1
             entry['istep_end'] = entry['istep_start'] + entry['istep_duration']
+            if entry['istep_end'] < entry['istep_end_1s']:
+                entry['istep_end_1s'] = entry['istep_end']
             try:
                 self.insert1(row=entry)
                 no_insert = False

@@ -13,13 +13,18 @@ from PIL import Image
 import allensdk_0_14_2.ephys_features as ft
 
 import stfio
+from stfio import StfIOException
 
 def load_current_step(abf_file, filetype='abf', channels=[0,1]):
     '''
     Load current clamp recordings from pClamp .abf files
     '''
     ch0, ch1 = channels[0], channels[1]
-    rec = stfio.read(abf_file)
+    try:
+        rec = stfio.read(abf_file)
+    except StfIOException:
+        rec = stfio.read(abf_file[:-4] + '.h5')  # for files converted to h5
+
     assert((rec[ch0].yunits in ['mV', 'pA']) and (rec[ch1].yunits in ['mV', 'pA']))
 
     data = OrderedDict()
@@ -52,6 +57,53 @@ def load_current_step(abf_file, filetype='abf', channels=[0,1]):
     data['current'] = [x.asarray() for x in data['current']]
 
     return data
+
+
+def load_current_step_add_itrace(abf_file, ihold, istart, istep, startend=None, filetype='abf', channels=[0]):
+    '''
+    Load current clamp recordings from pClamp .abf files with only voltage traces
+    '''
+    ch0 = channels[0]
+    rec = stfio.read(abf_file)
+    assert(rec[ch0].yunits == 'mV')
+
+    data = OrderedDict()
+    data['file_id'] = os.path.basename(abf_file).strip('.' + filetype)
+    data['file_directory'] = os.path.dirname(abf_file)
+    data['record_date'] = rec.datetime.date()
+    data['record_time'] = rec.datetime.time()
+
+    data['dt'] = rec.dt / 1000
+    data['hz'] = 1./rec.dt * 1000
+    data['time_unit'] = 's'
+
+    data['n_channels'] = len(rec)
+    data['channel_names'] = [rec[ch0].name, 'Current_simulated']
+    data['channel_units'] = [rec[ch0].yunits, 'pA']
+    data['n_sweeps'] = len(rec[ch0])
+    data['sweep_length'] = len(rec[ch0][0])
+
+    data['t'] = np.arange(0, data['sweep_length']) * data['dt']
+
+    start_idx = ft.find_time_index(data['t'], startend[0])
+    end_idx = ft.find_time_index(data['t'], startend[1])
+    current = [np.zeros_like(data['t']) + ihold for i in range(data['n_sweeps'])]
+    for i in range(data['n_sweeps']):
+        current[i][start_idx:end_idx] += istart + istep * i
+
+    data['voltage'] = rec[ch0]
+    data['voltage'] = [x.asarray() for x in data['voltage']]
+    data['current'] = current
+
+    current_channel = stfio.Channel([stfio.Section(x) for x in current])
+    current_channel.yunits = 'pA'
+    current_channel.name = 'Current_simulated'
+    chlist = [rec[ch0], current_channel]
+    rec_with_current = stfio.Recording(chlist)
+    rec_with_current.dt = rec.dt
+    rec_with_current.xunits = rec.xunits
+    rec_with_current.datetime = rec.datetime
+    return rec_with_current, data
 
 
 def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],

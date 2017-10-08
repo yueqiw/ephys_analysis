@@ -9,7 +9,7 @@ from current_clamp import *
 from current_clamp_features import extract_istep_features
 from read_metadata import *
 
-from pymysql import IntegrityError
+# from pymysql import IntegrityError
 import datajoint as dj
 schema = dj.schema('yueqi_ephys', locals())
 
@@ -38,12 +38,9 @@ class EphysExperimentsForAnalysis(dj.Manual):
         entry_list = entry_list.to_dict('records')
         no_insert = True
         for entry in entry_list:
-            try:
-                self.insert1(row=entry)
-                no_insert = False
-                print("Inserted: " + str(entry))
-            except IntegrityError:
-                continue
+            self.insert1(row=entry, skip_duplicates=True)
+            no_insert = False
+            #print("Inserted: " + str(entry))
         if no_insert:
             print("No new entry inserted.")
         return
@@ -63,7 +60,7 @@ class Organoids(DjImportedFromDirectory):
     slicetype: varchar(128) # what kind of slice prep
     external: varchar(128)  # external solution
     internal: varchar(128)  # internal solution
-    animal_comment = null: varchar(256)    # general comments
+    animal_comment = '': varchar(256)    # general comments
     """
 
     def _make_tuples(self, key):
@@ -95,12 +92,12 @@ class PatchCells(DjImportedFromDirectory):
     ra_est = null: float    # estimated Ra right after whole-cell mode
     rm_est = null: float    # estimated Rm
     v_rest = null: float     # resting membrane potential
-    fluor = null: varchar(128)      # fluorescent label
+    fluor = '': varchar(128)      # fluorescent label
     fill = 'No': enum('Yes', 'No')  # wether the cell is biocytin filled
-    cell_external = null: varchar(128)   # external if different from organoid metadata
-    cell_internal = null: varchar(128)   # internal if different from organoid metadata
-    depth = null: varchar(128)      # microns beneath slice surface
-    location = null: varchar(128)   # spatial location
+    cell_external = '': varchar(128)   # external if different from organoid metadata
+    cell_internal = '': varchar(128)   # internal if different from organoid metadata
+    depth = '': varchar(128)      # microns beneath slice surface
+    location = '': varchar(128)   # spatial location
     """
 
     def _make_tuples(self, key):
@@ -147,20 +144,20 @@ class EphysRecordings(DjImportedFromDirectory):
     recording: varchar(128) # recording file name
     ---
     clamp = null : enum('v', 'i')           # voltage or current clamp
-    protocol = null : varchar(128)          # protocols such as gapfree, istep, etc
+    protocol = '' : varchar(128)          # protocols such as gapfree, istep, etc
     hold = null : smallint                  # holding current or voltage
     ra_pre = null : smallint                # estimated Ra before protocol
     ra_post = null : smallint               # estimated Ra after protocol
-    compensate = null : varchar(128)        # percentage of Ra compensation
+    compensate = '' : varchar(128)        # percentage of Ra compensation
     gain = null : smallint                  # amplifier gain
     filter = null : smallint                # filter in kHz
     start = null : smallint                 # current step starting current
     step = null : smallint                  # step size of current injection
-    stim_strength = null : varchar(128)     # electrical/optical stimulation strength
+    stim_strength = '' : varchar(128)     # electrical/optical stimulation strength
     stim_duration = null : smallint         # duration of each stim pulse
     stim_interval = null : smallint         # interval between two consecutive pulses
-    response = null : varchar(256)          # what kind of reponse was observed
-    comment = null : varchar(256)           # general comments
+    response = '' : varchar(256)          # what kind of reponse was observed
+    comment = '' : varchar(256)           # general comments
     """
 
     def _make_tuples(self, key):
@@ -227,12 +224,9 @@ class CurrentStepTimeParams(dj.Manual):
             entry['istep_end'] = entry['istep_start'] + entry['istep_duration']
             if entry['istep_end'] < entry['istep_end_1s']:
                 entry['istep_end_1s'] = entry['istep_end']
-            try:
-                self.insert1(row=entry)
-                no_insert = False
-                print("Inserted: " + str(entry))
-            except IntegrityError:
-                continue
+            self.insert1(row=entry, skip_duplicates=True)
+            no_insert = False
+            #print("Inserted: " + str(entry))
         if no_insert:
             print("No new entry inserted.")
         return
@@ -336,9 +330,9 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
             newkey['cell'] = cell
             newkey['recording'] = rec
             newkey['params_id'] = params_id
-            _ = newkey.pop('file_id', None)
+            # _ = newkey.pop('file_id', None)
 
-            self.insert1(row=newkey)
+            self.insert1(row=newkey, ignore_extra_fields=True)
         return
 
 
@@ -412,8 +406,8 @@ class FICurvePlots(DjImportedFromDirectory):
     # Plot F-I curve from current clamp recordings. Save figures locally. Store file path.
     -> APandIntrinsicProperties
     ---
-    fi_svg_path = null : varchar(256)
-    fi_png_path = null : varchar(256)
+    fi_svg_path = '' : varchar(256)
+    fi_png_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
         features = (APandIntrinsicProperties() & key).fetch1()
@@ -452,8 +446,8 @@ class FirstSpikePlots(DjImportedFromDirectory):
     # Plot first spikes from current clamp recordings. Save figures locally. Store file path.
     -> APandIntrinsicProperties
     ---
-    spike_svg_path = null : varchar(256)
-    spike_png_path = null : varchar(256)
+    spike_svg_path = '' : varchar(256)
+    spike_png_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
         features = (APandIntrinsicProperties() & key).fetch1()
@@ -493,8 +487,8 @@ class PhasePlanes(DjImportedFromDirectory):
     # Plot phase planes of first spikes. Save figures locally. Store file path.
     -> APandIntrinsicProperties
     ---
-    phase_svg_path = null : varchar(256)
-    phase_png_path = null : varchar(256)
+    phase_svg_path = '' : varchar(256)
+    phase_png_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
         features = (APandIntrinsicProperties() & key).fetch1()
@@ -537,12 +531,12 @@ class CombinedPlots(DjImportedFromDirectory):
     -> FirstSpikePlots
     -> PhasePlanes
     ---
-    fi_spike_phase_small = null : varchar(256)
-    fi_spike_phase_istep_small = null : varchar(256)
-    fi_spike_phase_mid = null : varchar(256)
-    fi_spike_phase_istep_mid = null : varchar(256)
-    fi_spike_phase_large = null : varchar(256)
-    fi_spike_phase_istep_large = null : varchar(256)
+    fi_spike_phase_small = '' : varchar(256)
+    fi_spike_phase_istep_small = '' : varchar(256)
+    fi_spike_phase_mid = '' : varchar(256)
+    fi_spike_phase_istep_mid = '' : varchar(256)
+    fi_spike_phase_large = '' : varchar(256)
+    fi_spike_phase_istep_large = '' : varchar(256)
     """
 
     def _make_tuples(self, key):

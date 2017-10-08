@@ -1,1 +1,1 @@
-# ephys_viz
+# Visualization of ephys data using Dash + Plot.ly

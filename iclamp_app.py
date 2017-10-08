@@ -104,14 +104,14 @@ def cluster_heatmap():
 
     g = sns.clustermap(df, row_linkage=row_linkage, col_linkage=col_linkage, center=0,
                        col_colors = idx_color_mapping, figsize=(20,15))
-    _ = plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize=25)
-    _ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=0, fontsize=20)
+    _ = plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize=28)
+    _ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=0, fontsize=22)
 
     legend_patches = []
     for k, v in exp_lut.items():
         legend_patches.append(mpatches.Patch(color=v, label=k))
 
-    plt.legend(handles=legend_patches, fontsize=24)
+    plt.legend(handles=legend_patches, fontsize=28)
     return g
 
 g = cluster_heatmap()
@@ -132,10 +132,10 @@ app.layout = html.Div([
     html.Div([
         html.Div([
             html.H3('Select features to plot on PCA.')
-        ], style={'width':'50%', 'display': 'inline-block'}),
+        ], style={'width':'49%', 'display': 'inline-block'}),
         html.Div([
-            html.H3('', id='cell_info', style={'text-align': 'right'})
-        ], style={'display': 'inline-block'})
+            html.H3('', id='cell_info', style={'text-align': 'left'})
+        ], style={'width':'49%', 'display': 'inline-block'})
     ]),
     html.Div([
         html.Div([
@@ -147,7 +147,7 @@ app.layout = html.Div([
                             [{'label': v + ' ', 'value': k} for k, v in feature_names.items()],
                     value=None
                 )
-            ], style={'width': '50%'}),
+            ], style={'width': '30%'}),
         ], style={'width': '60%', 'display': 'inline-block'}),
         html.Div([
 
@@ -161,7 +161,7 @@ app.layout = html.Div([
                 labelStyle={'display': 'inline-block'}
             )
         ], style={'width': '39%', 'display': 'inline-block'})
-    ]),
+    ], style={'width': '100%', 'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'}),
 
     html.Div([
         html.Div([
@@ -176,7 +176,7 @@ app.layout = html.Div([
             html.Img(id='isteps', src='',
                     style={'height': '100%'})
             ], style={'width': '40%', 'height': '100%', 'display': 'inline-block'})
-    ], style={'height': '450px', 'max-width': '2000px', 'min-width': '1600px',
+    ], style={'height': '400px', 'width': '100%',
                 'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'}),
 
 
@@ -185,15 +185,16 @@ app.layout = html.Div([
             html.H3('Hierarchical clustering heatmap'),
             html.Img(id='cell_feature_heatmap', src=decoded_heatmap,
                     style={'height': '100%'})
-            ], style={'width': '60%', 'height': '100%', 'display': 'inline-block'}),
+            ], style={'width': '55%', 'height': '100%', 'display': 'inline-block'}),
         html.Div([
             dcc.Graph(id='cell_bar',
                     style={'height': '100%'})
-            ], style={'width': '38%', 'height': '130%', 'display': 'inline-block'})
+            ], style={'width': '30%', 'height': '130%', 'display': 'inline-block'}),
+        html.Div([], style={'width': '13%', 'height': '100%', 'display': 'inline-block'})
 
-    ], style={'height': '450px', 'max-width': '2000px', 'min-width': '1600px',
+    ], style={'height': '400px', 'width': '100%',
                 'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'})
-])
+], style={'width': '1600px', 'margin':'auto'})
 
 
 # callback functions
@@ -310,11 +311,14 @@ def update_cell_bar(hoverData):
         xaxis=dict(
             showticklabels=False,
         ),
+        yaxis=dict(
+            showticklabels=False,
+        ),
         margin=dict(
-            l=0,
+            l=00,
             r=150,
-            b=70,
-            t=113
+            b=55,
+            t=105
         ),
 
     )
@@ -361,7 +365,7 @@ def update_cell_info(hoverData):
     cell_info = cells_ap[cells_ap.recording == recording]
     idx = cell_info.index[0]
     #print(cell_info[['date', 'strain', 'cell', 'recording']])
-    return 'Date: {} -- Strain: {}  --  Recording: {} --  Heatmap Index: {}  ' \
+    return 'Date: {} -- Strain: {}  --  Recording: {} -- Index: {}  ' \
         .format(list(cell_info['date'])[0].strftime("%Y-%m-%d"), *[list(cell_info[x])[0] for x in ['strain', 'recording']], idx)
 
 #app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})

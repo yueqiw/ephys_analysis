@@ -71,14 +71,17 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
 
     # app layout
     app.layout = html.Div([
-        html.H1('Interactive Visualization for Patch Clamp Electrophysiology', style={'text-align': 'center'}),
+        html.H1('Interactive Visualization for Patch Clamp Electrophysiology',
+                style={'text-align': 'center', 'font-family':'helvetica', 'font-weight':'normal'}),
         html.Div([
             html.Div([
-                html.H1('Select features to plot on PCA.', id='plot_feature', style={'text-align': 'center'})
-            ], style={'width':'49%', 'display': 'inline-block'}),
+                html.H2('Select features to plot on PCA.', id='plot_feature',
+                    style={'text-align': 'center', 'font-family':'helvetica', 'font-weight':'normal'})
+            ], style={'width':'42%', 'display': 'inline-block'}),
             html.Div([
-                html.H3('', id='cell_info', style={'text-align': 'left'})
-            ], style={'width':'49%', 'display': 'inline-block'})
+                html.H3('', id='cell_info',
+                    style={'text-align': 'left', 'font-family':'helvetica', 'font-weight':'normal'})
+            ], style={'width':'57%', 'display': 'inline-block'})
         ]),
         html.Div([
             html.Div([
@@ -91,7 +94,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                         value=None
                     )
                 ], style={'width': '30%'}),
-            ], style={'width': '60%', 'display': 'inline-block'}),
+            ], style={'width': '54%', 'display': 'inline-block'}),
             html.Div([
 
                 dcc.RadioItems(
@@ -103,37 +106,42 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                     value='gif',
                     labelStyle={'display': 'inline-block'}
                 )
-            ], style={'width': '39%', 'display': 'inline-block'})
+            ], style={'width': '45%', 'display': 'inline-block'})
         ], style={'width': '100%', 'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'}),
 
         html.Div([
             html.Div([
                 dcc.Graph(id='cell_pca_3d', hoverData={'points': [{'hoverinfo': '2017_01_27_0009'}]},
                         style={'height': '100%'})
-                ], style={'width': '45%', 'height': '100%', 'display': 'inline-block', 'padding': '0 20'}),
+                ], style={'width': '42%', 'height': '100%', 'display': 'inline-block', 'padding': '0 20'}),
             html.Div([
                 html.Img(id='fi_spike_phase', src='',
                         style={'height': '100%'})
-                ], style={'width': '12%', 'height': '100%', 'display': 'inline-block'}),
+                ], style={'width': '10%', 'height': '100%', 'display': 'inline-block'}),
             html.Div([
                 html.Img(id='isteps', src='',
                         style={'height': '100%'})
-                ], style={'width': '40%', 'height': '100%', 'display': 'inline-block'})
+                ], style={'width': '30%', 'height': '100%', 'display': 'inline-block'}),
+            html.Div([
+                dcc.Graph(id='cell_bar_2',
+                        style={'height': '100%'})
+                ], style={'width': '18%', 'height': '100%', 'display': 'inline-block'})
+
         ], style={'height': '400px', 'width': '100%',
                     'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'}),
 
 
         html.Div([
             html.Div([
-                html.H3('Hierarchical clustering heatmap'),
+                html.H3('Hierarchical clustering heatmap', style={'font-family':'helvetica', 'font-weight':'normal'}),
                 html.Img(id='cell_feature_heatmap', src=decoded_heatmap,
                         style={'height': '100%'})
-                ], style={'width': '40%', 'height': '100%', 'display': 'inline-block'}),
+                ], style={'width': '42%', 'height': '100%', 'display': 'inline-block'}),
             html.Div([
                 dcc.Graph(id='cell_bar',
                         style={'height': '100%'})
                 ], style={'width': '30%', 'height': '130%', 'display': 'inline-block'}),
-            html.Div([], style={'width': '13%', 'height': '100%', 'display': 'inline-block'})
+            html.Div([], style={'width': '20%', 'height': '100%', 'display': 'inline-block'})
 
         ], style={'height': '400px', 'width': '100%',
                     'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'})
@@ -209,77 +217,6 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
             )
         }
 
-    @app.callback(
-        dash.dependencies.Output('cell_bar', 'figure'),
-        [dash.dependencies.Input('cell_pca_3d', 'hoverData')])
-    def update_cell_bar(hoverData):
-        '''Scatter plot highlighting all features of a selected cell.'''
-        recording = hoverData['points'][0]['hoverinfo']
-        features_scaled = cells_adapt_scaled[cells_ap.recording == recording][0][feature_order_hclust]
-        features_raw = cells_adapt_arr[cells_ap.recording == recording][0][feature_order_hclust]
-        features_name = cells_adapt_features.columns[feature_order_hclust]
-
-        background = [go.Scatter(
-            x=cells_adapt_scaled[i][feature_order_hclust],
-            y=features_name,
-            #orientation = 'h',
-            mode='markers+lines',
-            line=dict(
-                color='lightgrey',
-                width=2),
-            marker=dict(
-                size=5,
-                color='lightblue',
-                line=dict(
-                    color='grey',
-                    width=1.5,
-                )
-            ),
-            opacity=0.2,
-            hoverinfo='none'
-        ) for i in range(len(cells_adapt_features))]
-
-        hightlight = go.Scatter(
-            x=features_scaled,
-            y=features_name,
-            #orientation = 'h',
-            mode='markers+lines+text',
-            text=[str(x) for x in features_raw],
-            textposition='right',
-            line=dict(
-                color=muted['green'],
-                width=2),
-            marker=dict(
-                size=15,
-                color=muted['blue'],
-                line=dict(
-                    color='grey',
-                    width=1.5,
-                )
-            ),
-            opacity=0.8,
-            hoverinfo='none'
-        )
-
-        data = [*background, hightlight]
-        layout = go.Layout(
-            title=None,
-            showlegend=False,
-            xaxis=dict(
-                showticklabels=False,
-            ),
-            yaxis=dict(
-                showticklabels=False,
-            ),
-            margin=dict(
-                l=00,
-                r=150,
-                b=55,
-                t=105
-            ),
-
-        )
-        return {'data': data, 'layout': layout}
 
     @app.callback(
         dash.dependencies.Output('isteps', 'src'),
@@ -329,6 +266,166 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         #print(cell_info[['date', 'strain', 'cell', 'recording']])
         return 'Date: {} -- Strain: {}  --  Recording: {} -- Index: {}  ' \
             .format(list(cell_info['date'])[0].strftime("%Y-%m-%d"), *[list(cell_info[x])[0] for x in ['strain', 'recording']], idx)
+
+    @app.callback(
+        dash.dependencies.Output('cell_bar', 'figure'),
+        [dash.dependencies.Input('cell_pca_3d', 'hoverData')])
+    def update_cell_bar(hoverData):
+        '''Scatter plot highlighting all features of a selected cell.'''
+        recording = hoverData['points'][0]['hoverinfo']
+        features_scaled = cells_adapt_scaled[cells_ap.recording == recording][0][feature_order_hclust]
+        features_raw = cells_adapt_arr[cells_ap.recording == recording][0][feature_order_hclust]
+        features_name = cells_adapt_features.columns[feature_order_hclust]
+
+        background = [go.Scatter(
+            x=cells_adapt_scaled[i][feature_order_hclust],
+            y=features_name,
+            #orientation = 'h',
+            mode='markers+lines',
+            line=dict(
+                color='lightgrey',
+                width=2),
+            marker=dict(
+                size=5,
+                color='lightblue',
+                line=dict(
+                    color='grey',
+                    width=1.5,
+                )
+            ),
+            opacity=0.2,
+            hoverinfo='none'
+        ) for i in range(len(cells_adapt_features))]
+
+        hightlight = go.Scatter(
+            x=features_scaled,
+            y=features_name,
+            #orientation = 'h',
+            mode='markers+lines+text',
+            text=[format(x, '.3g') for x in features_raw],
+            textposition='right',
+            line=dict(
+                color=muted['green'],
+                width=2),
+            marker=dict(
+                size=15,
+                color=muted['blue'],
+                line=dict(
+                    color='grey',
+                    width=1.5,
+                )
+            ),
+            opacity=0.8,
+            hoverinfo='none'
+        )
+
+        data = [*background, hightlight]
+        layout = go.Layout(
+            title=None,
+            showlegend=False,
+            xaxis=dict(
+                showticklabels=False,
+            ),
+            yaxis=dict(
+                showticklabels=False,
+            ),
+            margin=dict(
+                l=00,
+                r=150,
+                b=55,
+                t=105
+            ),
+
+        )
+        return {'data': data, 'layout': layout}
+
+    @app.callback(
+        dash.dependencies.Output('cell_bar_2', 'figure'),
+        [dash.dependencies.Input('cell_pca_3d', 'hoverData')])
+    def update_cell_bar_2(hoverData):
+        '''Scatter plot highlighting all features of a selected cell.'''
+        recording = hoverData['points'][0]['hoverinfo']
+        features_scaled = cells_adapt_scaled[cells_ap.recording == recording][0][feature_order_hclust]
+        features_raw = cells_adapt_arr[cells_ap.recording == recording][0][feature_order_hclust]
+        features_name = cells_adapt_features.columns[feature_order_hclust]
+
+        background = [go.Scatter(
+            x=cells_adapt_scaled[i][feature_order_hclust],
+            y=features_name,
+            #orientation = 'h',
+            mode='markers+lines',
+            line=dict(
+                color='lightgrey',
+                width=2),
+            marker=dict(
+                size=5,
+                color='lightblue',
+                line=dict(
+                    color='grey',
+                    width=1.5,
+                )
+            ),
+            opacity=0.2,
+            hoverinfo='none'
+        ) for i in range(len(cells_adapt_features))]
+
+        hightlight = go.Scatter(
+            x=features_scaled,
+            y=features_name,
+            #orientation = 'h',
+            mode='markers+lines+text',
+            text=[feature_names[y] for y in features_name],
+            textposition='right',
+            line=dict(
+                color=muted['green'],
+                width=2),
+            marker=dict(
+                size=15,
+                color=muted['blue'],
+                line=dict(
+                    color='grey',
+                    width=1.5,
+                )
+            ),
+            opacity=0.8,
+            hoverinfo='none'
+        )
+
+        hightlight_2 = go.Scatter(
+            x=features_scaled,
+            y=features_name,
+            #orientation = 'h',
+            mode='markers+text',
+            text=[format(x, '.3g') for x in features_raw],
+            textposition='left',
+            marker=dict(
+                size=15,
+                color=muted['blue'],
+                opacity=0
+            ),
+            opacity=0.8,
+            hoverinfo='none'
+        )
+
+        data = [*background, hightlight, hightlight_2]
+        layout = go.Layout(
+            title=None,
+            showlegend=False,
+            xaxis=dict(
+                showticklabels=False,
+            ),
+            yaxis=dict(
+                showticklabels=False,
+            ),
+            margin=dict(
+                l=0,
+                r=0,
+                b=0,
+                t=0
+            ),
+
+        )
+        return {'data': data, 'layout': layout}
 
     #app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
     return app

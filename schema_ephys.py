@@ -13,28 +13,30 @@ from read_metadata import *
 import datajoint as dj
 schema = dj.schema('yueqi_ephys', locals())
 
-
+'''
 class DjImportedFromDirectory(dj.Imported):
     # Subclass of Imported. Initialize with data directory.
     def __init__(self, directory=''):
         self.directory = directory
         super().__init__()
-
+'''
 
 @schema
 class EphysExperimentsForAnalysis(dj.Manual):
     definition = """
-    # Organoid ephys experiments (excel files) for analysis
+    # Ephys experiments (excel files) for analysis
     experiment: varchar(128)    # excel files to use for analysis
     ---
+    project: varchar(128)      # which project the data belongs to
     use: enum('Yes', 'No')      # whether to use this experiment
+    directory: varchar(256)     # the parent project directory
     """
 
     def insert_experiment(self, excel_file):
         '''
-        Insert new organoid ephys metadata from excel to datajoint tables
+        Insert new sample ephys metadata from excel to datajoint tables
         '''
-        entry_list = pd.read_excel(excel_file)[['experiment', 'use']].dropna(how='any')
+        entry_list = pd.read_excel(excel_file)[['experiment', 'project', 'use', 'directory']].dropna(how='any')
         entry_list = entry_list.to_dict('records')
         no_insert = True
         for entry in entry_list:
@@ -47,13 +49,13 @@ class EphysExperimentsForAnalysis(dj.Manual):
 
 
 @schema
-class Organoids(DjImportedFromDirectory):
+class Animals(dj.Imported):
     definition = """
-    # Organoid metadata
+    # Sample metadata
     -> EphysExperimentsForAnalysis
     ---
     id: varchar(128)        # organod ID (use date, but need better naming)
-    strain: varchar(128)    # genetic strain
+    strain : varchar(128)    # genetic strain
     dob = null: date        # date of birth
     date = null: date       # recording date
     age = null: smallint    # nunmber of days (date - dob)
@@ -64,9 +66,11 @@ class Organoids(DjImportedFromDirectory):
     """
 
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         print('Populating for: ', key)
         animal_info, _ = read_ephys_info_from_excel_2017(
-                            os.path.join(self.directory, key['experiment'] + '.xlsx'))
+                            os.path.join(directory, key['experiment'] + '.xlsx'))
         key['id'] = animal_info['id']
         key['strain'] = animal_info['strain']
         if not pd.isnull(animal_info['DOB']): key['dob'] = animal_info['DOB']
@@ -81,7 +85,7 @@ class Organoids(DjImportedFromDirectory):
 
 
 @schema
-class PatchCells(DjImportedFromDirectory):
+class PatchCells(dj.Imported):
     definition = """
     # Patch clamp metadata for each cell
     -> EphysExperimentsForAnalysis
@@ -94,16 +98,18 @@ class PatchCells(DjImportedFromDirectory):
     v_rest = null: float     # resting membrane potential
     fluor = '': varchar(128)      # fluorescent label
     fill = 'No': enum('Yes', 'No')  # wether the cell is biocytin filled
-    cell_external = '': varchar(128)   # external if different from organoid metadata
-    cell_internal = '': varchar(128)   # internal if different from organoid metadata
+    cell_external = '': varchar(128)   # external if different from sample metadata
+    cell_internal = '': varchar(128)   # internal if different from sample metadata
     depth = '': varchar(128)      # microns beneath slice surface
     location = '': varchar(128)   # spatial location
     """
 
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         print('Populating for: ', key)
         _, metadata = read_ephys_info_from_excel_2017(
-                            os.path.join(self.directory, key['experiment'] + '.xlsx'))
+                            os.path.join(directory, key['experiment'] + '.xlsx'))
         if 'params' in metadata.columns:
             old_file = True
             cell_info = parse_cell_info_2017_vertical(metadata)
@@ -136,7 +142,7 @@ class PatchCells(DjImportedFromDirectory):
         return
 
 @schema
-class EphysRecordings(DjImportedFromDirectory):
+class EphysRecordings(dj.Imported):
     definition = """
     # Patch clamp metadata for each recording file
     -> EphysExperimentsForAnalysis
@@ -161,9 +167,11 @@ class EphysRecordings(DjImportedFromDirectory):
     """
 
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         print('Populating for: ', key)
         _, metadata = read_ephys_info_from_excel_2017(
-                            os.path.join(self.directory, key['experiment'] + '.xlsx'))
+                            os.path.join(directory, key['experiment'] + '.xlsx'))
         patch_info = parse_patch_info_2017(metadata)
 
         for i, row in patch_info.iterrows():
@@ -250,7 +258,7 @@ class FeatureExtractionParams(dj.Lookup):
 
 
 @schema
-class APandIntrinsicProperties(DjImportedFromDirectory):
+class APandIntrinsicProperties(dj.Imported):
     definition = """
     # Action potential and intrinsic properties from current injections
     -> EphysExperimentsForAnalysis
@@ -304,20 +312,22 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
 
     """
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         # use the first second of current injection for analysis, regardless of the actual duration.
         istep_start, istep_end_1s = \
                 (CurrentStepTimeParams() & key).fetch1('istep_start', 'istep_end_1s')
 
-        this_organoid = (EphysExperimentsForAnalysis() & key)
+        this_sample = (EphysExperimentsForAnalysis() & key)
         all_istep_recordings = (EphysRecordings()  & "protocol = 'istep'")
-        cells, istep_recordings = (all_istep_recordings * this_organoid).fetch('cell','recording')
+        cells, istep_recordings = (all_istep_recordings * this_sample).fetch('cell','recording')
 
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
 
         for cell, rec in zip(cells, istep_recordings):
             print('Populating for: ' + key['experiment'] + ' ' + rec)
-            abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
+            abf_file = os.path.join(directory, key['experiment'], rec + '.abf')
             data = load_current_step(abf_file)
             cell_features, summary_features = \
                         extract_istep_features(data, start=istep_start, end=istep_end_1s,
@@ -337,7 +347,7 @@ class APandIntrinsicProperties(DjImportedFromDirectory):
 
 
 @schema
-class CurrentStepPlots(DjImportedFromDirectory):
+class CurrentStepPlots(dj.Imported):
     definition = """
     # Plot current clamp raw sweeps + detected spikes. Save figures locally. Store file path.
     -> APandIntrinsicProperties
@@ -349,9 +359,11 @@ class CurrentStepPlots(DjImportedFromDirectory):
     """
 
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         rec = key['recording']
         print('Populating for: ' + key['experiment'] + ' ' + rec)
-        abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
+        abf_file = os.path.join(directory, key['experiment'], rec + '.abf')
         data = load_current_step(abf_file)
 
         istep_start, istep_end = \
@@ -361,8 +373,8 @@ class CurrentStepPlots(DjImportedFromDirectory):
         params_id = params.pop('params_id', None)
 
         parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
-        if not os.path.exists(os.path.join(self.directory, parent_directory)):
-            os.mkdir(os.path.join(self.directory, parent_directory))
+        if not os.path.exists(os.path.join(directory, parent_directory)):
+            os.mkdir(os.path.join(directory, parent_directory))
 
         # The fetched features only contain AP time points for the 1st second
         # features = (APandIntrinsicProperties() & key).fetch1()
@@ -379,13 +391,13 @@ class CurrentStepPlots(DjImportedFromDirectory):
                                 bias_current = features['bias_current'],
                                 save=False)
         for filetype in ['png', 'pdf', 'svg', 'gif']:
-            target_folder = os.path.join(self.directory, parent_directory, filetype)
+            target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
         for filetype in ['png', 'pdf', 'svg']:
             target_folder = os.path.join(parent_directory, filetype)
             key[filetype + '_path'] = os.path.join(target_folder, rec + '.' + filetype)
-            fig.savefig(os.path.join(self.directory, key[filetype + '_path']), dpi=300)
+            fig.savefig(os.path.join(directory, key[filetype + '_path']), dpi=300)
         plt.show()
 
         key['gif_path'] = os.path.join(parent_directory, 'gif', rec + '.gif')
@@ -394,14 +406,14 @@ class CurrentStepPlots(DjImportedFromDirectory):
                             spikes_sweep_id = features['spikes_sweep_id'],
                             bias_current = features['bias_current'],
                             save=True,
-                            save_filepath = os.path.join(self.directory, key['gif_path']))
+                            save_filepath = os.path.join(directory, key['gif_path']))
         plt.close(anim)
         self.insert1(row=key)
         return
 
 
 @schema
-class FICurvePlots(DjImportedFromDirectory):
+class FICurvePlots(dj.Imported):
     definition = """
     # Plot F-I curve from current clamp recordings. Save figures locally. Store file path.
     -> APandIntrinsicProperties
@@ -410,6 +422,8 @@ class FICurvePlots(DjImportedFromDirectory):
     fi_png_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         features = (APandIntrinsicProperties() & key).fetch1()
         if features['has_ap'] == 'No':
             self.insert1(row=key)
@@ -420,10 +434,10 @@ class FICurvePlots(DjImportedFromDirectory):
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
         parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
-        if not os.path.exists(os.path.join(self.directory, parent_directory)):
-            os.mkdir(os.path.join(self.directory, parent_directory))
+        if not os.path.exists(os.path.join(directory, parent_directory)):
+            os.mkdir(os.path.join(directory, parent_directory))
         for filetype in ['fi_png', 'fi_svg']:
-            target_folder = os.path.join(self.directory, parent_directory, filetype)
+            target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
         # The fetched features only contain AP time points for the 1st second
@@ -433,15 +447,15 @@ class FICurvePlots(DjImportedFromDirectory):
         fi_curve = plot_fi_curve(features['all_stim_amp'], features['all_firing_rate'])
         key['fi_png_path'] = os.path.join(parent_directory, 'fi_png', 'fi_' + rec + '.png')
         key['fi_svg_path'] = os.path.join(parent_directory, 'fi_svg', 'fi_' + rec + '.svg')
-        fi_curve.savefig(os.path.join(self.directory, key['fi_png_path']), dpi=300)
-        fi_curve.savefig(os.path.join(self.directory, key['fi_svg_path']))
+        fi_curve.savefig(os.path.join(directory, key['fi_png_path']), dpi=300)
+        fi_curve.savefig(os.path.join(directory, key['fi_svg_path']))
         plt.show()
         self.insert1(row=key)
         return
 
 
 @schema
-class FirstSpikePlots(DjImportedFromDirectory):
+class FirstSpikePlots(dj.Imported):
     definition = """
     # Plot first spikes from current clamp recordings. Save figures locally. Store file path.
     -> APandIntrinsicProperties
@@ -450,6 +464,8 @@ class FirstSpikePlots(DjImportedFromDirectory):
     spike_png_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         features = (APandIntrinsicProperties() & key).fetch1()
         if features['has_ap'] == 'No':
             self.insert1(row=key)
@@ -460,29 +476,29 @@ class FirstSpikePlots(DjImportedFromDirectory):
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
         parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
-        if not os.path.exists(os.path.join(self.directory, parent_directory)):
-            os.mkdir(os.path.join(self.directory, parent_directory))
+        if not os.path.exists(os.path.join(directory, parent_directory)):
+            os.mkdir(os.path.join(directory, parent_directory))
         for filetype in ['spike_png', 'spike_svg']:
-            target_folder = os.path.join(self.directory, parent_directory, filetype)
+            target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
         # The fetched features only contain AP time points for the 1st second
         # Only use the 1st second for consistency
-        abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
+        abf_file = os.path.join(directory, key['experiment'], rec + '.abf')
         data = load_current_step(abf_file)
 
         first_spike = plot_first_spike(data, features, time_zero='threshold')
         key['spike_png_path'] = os.path.join(parent_directory, 'spike_png', 'spike_' + rec + '.png')
         key['spike_svg_path'] = os.path.join(parent_directory, 'spike_svg', 'spike_' + rec + '.svg')
-        first_spike.savefig(os.path.join(self.directory, key['spike_png_path']), dpi=300)
-        first_spike.savefig(os.path.join(self.directory, key['spike_svg_path']))
+        first_spike.savefig(os.path.join(directory, key['spike_png_path']), dpi=300)
+        first_spike.savefig(os.path.join(directory, key['spike_svg_path']))
         plt.show()
         self.insert1(row=key)
         return
 
 
 @schema
-class PhasePlanes(DjImportedFromDirectory):
+class PhasePlanes(dj.Imported):
     definition = """
     # Plot phase planes of first spikes. Save figures locally. Store file path.
     -> APandIntrinsicProperties
@@ -491,6 +507,8 @@ class PhasePlanes(DjImportedFromDirectory):
     phase_png_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         features = (APandIntrinsicProperties() & key).fetch1()
         if features['has_ap'] == 'No':
             self.insert1(row=key)
@@ -501,29 +519,29 @@ class PhasePlanes(DjImportedFromDirectory):
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
         parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
-        if not os.path.exists(os.path.join(self.directory, parent_directory)):
-            os.mkdir(os.path.join(self.directory, parent_directory))
+        if not os.path.exists(os.path.join(directory, parent_directory)):
+            os.mkdir(os.path.join(directory, parent_directory))
         for filetype in ['phase_png', 'phase_svg']:
-            target_folder = os.path.join(self.directory, parent_directory, filetype)
+            target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
         # The fetched features only contain AP time points for the 1st second
         # Only use the 1st second for consistency
-        abf_file = os.path.join(self.directory, key['experiment'], rec + '.abf')
+        abf_file = os.path.join(directory, key['experiment'], rec + '.abf')
         data = load_current_step(abf_file)
 
         phase_plane = plot_phase_plane(data, features, filter=0.005)
         key['phase_png_path'] = os.path.join(parent_directory, 'phase_png', 'phase_' + rec + '.png')
         key['phase_svg_path'] = os.path.join(parent_directory, 'phase_svg', 'phase_' + rec + '.svg')
-        phase_plane.savefig(os.path.join(self.directory, key['phase_png_path']), dpi=300)
-        phase_plane.savefig(os.path.join(self.directory, key['phase_svg_path']))
+        phase_plane.savefig(os.path.join(directory, key['phase_png_path']), dpi=300)
+        phase_plane.savefig(os.path.join(directory, key['phase_svg_path']))
         plt.show()
         self.insert1(row=key)
         return
 
 
 @schema
-class CombinedPlots(DjImportedFromDirectory):
+class CombinedPlots(dj.Imported):
     definition = """
     # Combine F-I, first spike, phase plane and current step plots together.
     -> CurrentStepPlots
@@ -540,6 +558,8 @@ class CombinedPlots(DjImportedFromDirectory):
     """
 
     def _make_tuples(self, key):
+        ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
+        directory = os.path.expanduser(ephys_exp.pop('directory', None))
         fi = (FICurvePlots() & key).fetch1('fi_png_path')
         spike = (FirstSpikePlots() & key).fetch1('spike_png_path')
         phase = (PhasePlanes() & key).fetch1('phase_png_path')
@@ -554,21 +574,21 @@ class CombinedPlots(DjImportedFromDirectory):
         params_id = params.pop('params_id', None)
         parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
 
-        left_large = combine_vertical([Image.open(os.path.join(self.directory, x)) for x in [fi, spike, phase]], scale=1)
+        left_large = combine_vertical([Image.open(os.path.join(directory, x)) for x in [fi, spike, phase]], scale=1)
         left_mid = left_large.resize([int(x * 0.5) for x in left_large.size], resample=Image.BICUBIC)
         left_small = left_large.resize([int(x * 0.2) for x in left_large.size], resample=Image.BICUBIC)
-        all_large = combine_horizontal([left_large, Image.open(os.path.join(self.directory, istep))], scale=1)
+        all_large = combine_horizontal([left_large, Image.open(os.path.join(directory, istep))], scale=1)
         all_mid = all_large.resize([int(x * 0.5) for x in all_large.size], resample=Image.BICUBIC)
         all_small = all_large.resize([int(x * 0.2) for x in all_large.size], resample=Image.BICUBIC)
 
         for fpath , img in zip(['fi_spike_phase_large', 'fi_spike_phase_mid', 'fi_spike_phase_small',
                             'fi_spike_phase_istep_large', 'fi_spike_phase_istep_mid', 'fi_spike_phase_istep_small'],
                             [left_large, left_mid, left_small, all_large, all_mid, all_small]):
-            target_folder = os.path.join(self.directory, parent_directory, fpath)
+            target_folder = os.path.join(directory, parent_directory, fpath)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
             key[fpath] = os.path.join(parent_directory, fpath, fpath + '_' + rec + '.png')
 
-            img.save(os.path.join(self.directory, key[fpath]))
+            img.save(os.path.join(directory, key[fpath]))
         self.insert1(row=key)
         return

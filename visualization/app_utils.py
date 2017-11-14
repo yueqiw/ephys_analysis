@@ -9,23 +9,23 @@ import matplotlib.patches as mpatches
 import io
 import base64
 
-feature_names = dict(tau='Membrane Time Constant',
-                     input_resistance='Input Resistance',
+feature_names = dict(tau='Membrane Time Constant (ms)',
+                     input_resistance='Input Resistance (mOhm)',
                      sag='Sag',
-                     cm_est='Membrane Capacitance',
-                     v_rest='Resting Vm',
+                     cm_est='Membrane Capacitance (pF)',
+                     v_rest='Resting Vm (mV)',
                     f_i_curve_slope='F-I Curve Slope',
-                    ap_threshold='Spike threshold',
-                    ap_width='Spike Width',
-                    ap_height='Spike Height',
-                    ap_peak='Spike Peak',
-                    ap_trough='Spike Trough',
-                    ap_trough_to_threshold='Spike Trough-to-Threshold',
+                    ap_threshold='Spike threshold (mV)',
+                    ap_width='Spike Width (ms)',
+                    ap_height='Spike Height (mV)',
+                    ap_peak='Spike Peak (mV)',
+                    ap_trough='Spike Trough (mV)',
+                    ap_trough_to_threshold='Spike Trough-to-Threshold (mV)',
                     ap_upstroke='Spike Upstroke',
                     ap_downstroke='Spike Downstroke',
                     ap_updownstroke_ratio='Upstroke-Downstroke Ratio',
-                    hs_firing_rate='Firing Rate',
-                    hs_latency='First Spike Latency',
+                    hs_firing_rate='Firing Rate (Hz)',
+                    hs_latency='First Spike Latency (ms)',
                     hs_adaptation='Adaptation')
 
 features_noAP = ['tau', 'input_resistance', 'sag', 'cm_est', 'v_rest']

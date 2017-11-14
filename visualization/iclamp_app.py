@@ -38,7 +38,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
 
     # subset cells with and without action potentials
     cells_all = unique_isteps[[x for x in unique_isteps.columns if x != 'duplicates']]
-    cells_ap = cells_all[cells_all['has_ap'] == 'Yes'].reset_index(drop=True)
+    cells_ap = cells_all[(cells_all['has_ap'] == 'Yes') & (cells_all['hs_firing_rate'] >0)].reset_index(drop=True)
     cells_ap = cells_ap[cells_ap['cm_est'] < 75].reset_index(drop=True)  # remove outlier
     # cells_noap = cells_all[cells_all['has_ap'] == 'No'].reset_index(drop=True)
 
@@ -188,6 +188,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                     size=8,
                     # color=['rgb(' + ', '.join(list(map(str, x))) + ')' for x in idx_color_mapping],
                     color=color,
+                    colorbar=go.ColorBar(len=0.25,showticklabels=False, thickness=15, outlinewidth=0),
                     colorscale='RdYlBu',
                     # color='rgb(' + ', '.join(list(map(str, idx_color_mapping[0]))) + ')',
                     opacity=0.8
@@ -197,11 +198,11 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                 title="PCA",
                 scene = dict(
                     xaxis=dict(title="PC-1 (%0.0f%%)" % (pca.explained_variance_ratio_[0]*100),
-                              titlefont=dict(size=25)),
+                              titlefont=dict(size=22)),
                     yaxis=dict(title="PC-2 (%0.0f%%)" % (pca.explained_variance_ratio_[1]*100),
-                              titlefont=dict(size=25)),
+                              titlefont=dict(size=22)),
                     zaxis=dict(title="PC-3 (%0.0f%%)" % (pca.explained_variance_ratio_[2]*100),
-                              titlefont=dict(size=25)),
+                              titlefont=dict(size=22)),
                     camera = dict(
                     up=dict(x=0, y=0, z=1),
                     center=dict(x=0, y=0, z=0),
@@ -432,4 +433,4 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
 
 if __name__ == '__main__':
     app = iclamp_viz()
-    app.run_server(port=1234, debug=True)
+    app.run_server(port=1235, debug=True)

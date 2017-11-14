@@ -22,7 +22,7 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
     '''
     if filter * 1000 >= data['hz']:
         filter = None
-        
+
     istep_ext = efex.EphysSweepSetFeatureExtractor(
                                 [data['t']]*data['n_sweeps'],
                                 data['voltage'],
@@ -106,7 +106,7 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
                         ('has_ap', has_AP),
                         ('v_baseline', v_baseline),
                         ('bias_current', bias_current),
-                        ('tau', cell_features['tau']),
+                        ('tau', cell_features['tau'] * 1000),
                         ('capacitance' , cell_features['tau'] / cell_features['input_resistance'] * 10**6 \
                                         if cell_features['input_resistance'] > 0 else None),
                         ('input_resistance', cell_features['input_resistance'] \
@@ -118,7 +118,7 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
                         ('vm_for_sag', cell_features['vm_for_sag']),
 
                         ('ap_threshold', first_spike.get('threshold_v')),
-                        ('ap_width', first_spike.get('width')),
+                        ('ap_width', first_spike.get('width') * 1000),
                         ('ap_height', first_spike['peak_v'] - first_spike['trough_v'] if has_AP else None),
                         ('ap_peak', first_spike.get('peak_v')),
 
@@ -131,7 +131,7 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
                         ('hs_firing_rate' , mean_rate if hero_sweep else None),
                         ('hs_adaptation' , adapt if hero_sweep else None),
                         ('hs_median_isi' , median_isi if hero_sweep else None),
-                        ('hs_latency' , latency if hero_sweep else None),
+                        ('hs_latency' , latency * 1000 if hero_sweep else None),
 
                         ('rheobase_index', cell_features['rheobase_extractor_index']),
                         ('rheobase_stim_amp', cell_features['rheobase_i']),

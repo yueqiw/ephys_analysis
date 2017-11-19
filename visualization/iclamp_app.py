@@ -75,7 +75,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                 style={'text-align': 'center', 'font-family':'helvetica', 'font-weight':'normal'}),
         html.Div([
             html.Div([
-                html.H2('Select features to plot on PCA.', id='plot_feature',
+                html.H2('Select features to plot on PCA', id='plot_feature',
                     style={'text-align': 'center', 'font-family':'helvetica', 'font-weight':'normal'})
             ], style={'width':'42%', 'display': 'inline-block'}),
             html.Div([
@@ -156,9 +156,11 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     def return_feature(feature):
         '''update the feature name used for PCA'''
         if feature in feature_names:
-            return "Plot on PCA -- " + feature_names[feature]
+            return feature_names[feature]
+        elif feature is None:
+            return 'Select features to plot on PCA'
         else:
-            return "Plot on PCA -- " + feature
+            return feature.title()
 
     @app.callback(
         dash.dependencies.Output('cell_pca_3d', 'figure'),

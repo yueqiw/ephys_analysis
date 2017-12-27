@@ -53,7 +53,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     pca = PCA(n_components = None)
     pca.fit(cells_adapt_scaled)
     cells_adapt_pca = pca.transform(cells_adapt_scaled)
-    cells_adapt_pca_minmax = preprocessing.MinMaxScaler().fit_transform(cells_adapt_pca) * 0.8 + 0.1
+    cells_adapt_pca_minmax = preprocessing.MinMaxScaler().fit_transform(cells_adapt_pca) * 0.95 + 0.025
 
     # labels and color maps
     text_labels = ['-'.join([x, y]) for x, y in zip(cells_ap['experiment'], cells_ap['recording'])]

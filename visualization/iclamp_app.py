@@ -44,7 +44,13 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
 
     # select useful features
     # cells_ap_features = cells_ap[features_noAP + features_ap]
-    cells_adapt_features = cells_ap[features_noAP + features_ap + ['hs_adaptation']].fillna(value={'hs_adaptation':0})
+    cells_adapt_features = cells_ap[features_noAP + features_ap + ['adapt_avg']].fillna(value={'adapt_avg':0})
+    cells_adapt_arr_raw = np.array(cells_adapt_features)
+
+    # log transform
+    cells_adapt_features['ap_width'] = np.log10(cells_adapt_features['ap_width'])
+    cells_adapt_features['ap_upstroke'] = np.log10(cells_adapt_features['ap_upstroke'])
+
     cells_adapt_arr = np.array(cells_adapt_features)
 
     # run PCA
@@ -63,7 +69,8 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     idx_color_mapping = cells_ap['experiment'].map(exp_lut)
 
     # generate cluster heatmap using Seaborn
-    g = cluster_heatmap(cells_adapt_scaled, feature_names, idx_color_mapping, exp_lut, legend=False)
+    features = [feature_names[x] for x in cells_adapt_features.columns]
+    g = cluster_heatmap(cells_adapt_scaled, features, idx_color_mapping, exp_lut, legend=False)
     feature_order_hclust = g.dendrogram_row.reordered_ind[::-1]
     # encode the heatmap png image into memory buffer
     decoded_heatmap = byte_encode_img(g)
@@ -168,7 +175,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     def update_cell_pca_3d(feature):
         '''draw 3D PCA plot with selected feature'''
         if feature is None:
-            color = ['rgba(' + str(a) + ', ' + str(c) + ', ' + str(b) + ')' \
+            color = ['rgba(' + str(1-a) + ', ' + str(b) + ', ' + str(c) + ')' \
                    for a,b,c in cells_adapt_pca_minmax[:,:3]]
         elif feature == 'experiment':
             color = ['rgba(' + str(a-0.001) + ', ' + str(b-0.001) + ', ' + str(c-0.001) + ')' \
@@ -180,9 +187,9 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
 
         return {
             'data': [go.Scatter3d(
-                x=-cells_adapt_pca[:,0],
-                y=cells_adapt_pca[:,1],
-                z=cells_adapt_pca[:,2],
+                x=cells_adapt_pca[:,0],
+                y=cells_adapt_pca[:,2],
+                z=cells_adapt_pca[:,1],
                 mode='markers',
                 text=text_labels,
                 hoverinfo=[x for x in cells_ap['recording']],
@@ -201,9 +208,9 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                 scene = dict(
                     xaxis=dict(title="PC-1 (%0.0f%%)" % (pca.explained_variance_ratio_[0]*100),
                               titlefont=dict(size=22)),
-                    yaxis=dict(title="PC-2 (%0.0f%%)" % (pca.explained_variance_ratio_[1]*100),
+                    yaxis=dict(title="PC-3 (%0.0f%%)" % (pca.explained_variance_ratio_[2]*100),
                               titlefont=dict(size=22)),
-                    zaxis=dict(title="PC-3 (%0.0f%%)" % (pca.explained_variance_ratio_[2]*100),
+                    zaxis=dict(title="PC-2 (%0.0f%%)" % (pca.explained_variance_ratio_[1]*100),
                               titlefont=dict(size=22)),
                     camera = dict(
                     up=dict(x=0, y=0, z=1),
@@ -277,7 +284,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         '''Scatter plot highlighting all features of a selected cell.'''
         recording = hoverData['points'][0]['hoverinfo']
         features_scaled = cells_adapt_scaled[cells_ap.recording == recording][0][feature_order_hclust]
-        features_raw = cells_adapt_arr[cells_ap.recording == recording][0][feature_order_hclust]
+        features_raw = cells_adapt_arr_raw[cells_ap.recording == recording][0][feature_order_hclust]
         features_name = cells_adapt_features.columns[feature_order_hclust]
 
         background = [go.Scatter(
@@ -349,7 +356,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         '''Scatter plot highlighting all features of a selected cell.'''
         recording = hoverData['points'][0]['hoverinfo']
         features_scaled = cells_adapt_scaled[cells_ap.recording == recording][0][feature_order_hclust]
-        features_raw = cells_adapt_arr[cells_ap.recording == recording][0][feature_order_hclust]
+        features_raw = cells_adapt_arr_raw[cells_ap.recording == recording][0][feature_order_hclust]
         features_name = cells_adapt_features.columns[feature_order_hclust]
 
         background = [go.Scatter(

@@ -332,7 +332,7 @@ class APandIntrinsicProperties(dj.Imported):
         for cell, rec in zip(cells, istep_recordings):
             print('Populating for: ' + key['experiment'] + ' ' + rec)
             abf_file = os.path.join(directory, key['experiment'], rec + '.abf')
-            data = load_current_step(abf_file)
+            data = load_current_step(abf_file, min_voltage=-140)
             cell_features, summary_features = \
                         extract_istep_features(data, start=istep_start, end=istep_end_1s,
                         **params)
@@ -368,7 +368,7 @@ class CurrentStepPlots(dj.Imported):
         rec = key['recording']
         print('Populating for: ' + key['experiment'] + ' ' + rec)
         abf_file = os.path.join(directory, key['experiment'], rec + '.abf')
-        data = load_current_step(abf_file)
+        data = load_current_step(abf_file, min_voltage=-140)
 
         istep_start, istep_end = \
                 (CurrentStepTimeParams() & key).fetch1('istep_start', 'istep_end')
@@ -489,7 +489,7 @@ class FirstSpikePlots(dj.Imported):
         # The fetched features only contain AP time points for the 1st second
         # Only use the 1st second for consistency
         abf_file = os.path.join(directory, key['experiment'], rec + '.abf')
-        data = load_current_step(abf_file)
+        data = load_current_step(abf_file, min_voltage=-140)
 
         first_spike = plot_first_spike(data, features, time_zero='threshold')
         key['spike_png_path'] = os.path.join(parent_directory, 'spike_png', 'spike_' + rec + '.png')
@@ -532,7 +532,7 @@ class PhasePlanes(dj.Imported):
         # The fetched features only contain AP time points for the 1st second
         # Only use the 1st second for consistency
         abf_file = os.path.join(directory, key['experiment'], rec + '.abf')
-        data = load_current_step(abf_file)
+        data = load_current_step(abf_file, min_voltage=-140)
 
         phase_plane = plot_phase_plane(data, features, filter=0.005)
         key['phase_png_path'] = os.path.join(parent_directory, 'phase_png', 'phase_' + rec + '.png')

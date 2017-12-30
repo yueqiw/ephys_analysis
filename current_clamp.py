@@ -15,9 +15,10 @@ import allensdk_0_14_2.ephys_features as ft
 import stfio
 from stfio import StfIOException
 
-def load_current_step(abf_file, filetype='abf', channels=[0,1]):
+def load_current_step(abf_file, filetype='abf', channels=[0,1], min_voltage=-140):
     '''
     Load current clamp recordings from pClamp .abf files
+    min_voltage: None or a number (e.g. -130), traces with min below this voltage are not loaded.
     '''
     ch0, ch1 = channels[0], channels[1]
     try:
@@ -55,6 +56,16 @@ def load_current_step(abf_file, filetype='abf', channels=[0,1]):
         raise ValueError("channel y-units must be 'mV' or 'pA'.")
     data['voltage'] = [x.asarray() for x in data['voltage']]
     data['current'] = [x.asarray() for x in data['current']]
+
+
+    if not min_voltage is None:
+        to_pop = []
+        for i, x in enumerate(data['voltage']):
+            if np.min(x) < min_voltage:
+                to_pop.append(i)
+        data['voltage'] = [x for i, x in enumerate(data['voltage']) if not i in to_pop]
+        data['current'] = [x for i, x in enumerate(data['current']) if not i in to_pop]
+        data['n_sweeps'] -= len(to_pop)
 
     return data
 

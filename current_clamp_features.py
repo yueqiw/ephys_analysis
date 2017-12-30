@@ -100,6 +100,13 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
             spikes_sweep_id.append(swp['id'])
             spikes_peak_t.append(spike['peak_t'])
 
+    spikes_threshold_t = np.array(spikes_threshold_t)
+    spikes_sweep_id = np.array(spikes_sweep_id)
+    spikes_peak_t = np.array(spikes_peak_t)
+
+    adapt_avg = calculate_adapt(spikes_sweep_id, spikes_peak_t, start, end,
+                                    adapt_interval=1.0, max_isi_ratio=2.5)
+
 
     summary_features = OrderedDict([
                         ('file_id', data['file_id']),
@@ -118,14 +125,15 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
                         ('vm_for_sag', cell_features['vm_for_sag']),
 
                         ('ap_threshold', first_spike.get('threshold_v')),
-                        ('ap_width', first_spike.get('width') * 1000),
+                        ('ap_width', first_spike.get('width') * 1000 if not first_spike.get('width') is None else None),
                         ('ap_height', first_spike['peak_v'] - first_spike['trough_v'] if has_AP else None),
                         ('ap_peak', first_spike.get('peak_v')),
 
                         ('ap_trough', first_spike.get('trough_v')),
                         ('ap_trough_to_threshold', first_spike['threshold_v'] - first_spike['trough_v'] if has_AP else None),
+                        ('ap_peak_to_threshold', first_spike['peak_v'] - first_spike['threshold_v'] if has_AP else None),
                         ('ap_upstroke',first_spike.get('upstroke')),
-                        ('ap_downstroke', first_spike.get('downstroke')),
+                        ('ap_downstroke', - first_spike.get('downstroke') if has_AP else None),  # make it positive
                         ('ap_updownstroke_ratio', first_spike.get('upstroke_downstroke_ratio')),
 
                         ('hs_firing_rate' , mean_rate if hero_sweep else None),
@@ -145,10 +153,75 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
                         ('all_median_isi', np.array([swp.get('median_isi', np.nan) for swp in cell_features['sweeps']])),
                         ('all_first_isi', np.array([swp.get('first_isi', np.nan) for swp in cell_features['sweeps']])),
                         ('all_latency', np.array([swp.get('latency', np.nan) for swp in cell_features['sweeps']])),
-                        ('spikes_sweep_id', np.array(spikes_sweep_id)),
-                        ('spikes_threshold_t', np.array(spikes_threshold_t)),
-                        ('spikes_peak_t', np.array(spikes_peak_t))
+                        ('spikes_sweep_id', spikes_sweep_id),
+                        ('spikes_threshold_t', spikes_threshold_t),
+                        ('spikes_peak_t', spikes_peak_t),
+                        ('adapt_avg', adapt_avg)
 
     ])
 
     return cell_features, summary_features
+
+
+def calculate_adapt(spikes_sweep_id, spikes_peak_t, start, end, adapt_interval=1.0,
+                    min_peaks=4, max_isi_ratio=2.5, firing_rate_target=None):
+    if len(spikes_sweep_id) == 0:
+        return None
+    end_adapt = start + adapt_interval
+    sweep_id = spikes_sweep_id[spikes_peak_t < end_adapt]
+    peaks_all = spikes_peak_t[spikes_peak_t < end_adapt]
+
+    peaks = dict()
+    for k, v in zip(sweep_id, peaks_all):
+        if peaks.get(k) is not None:
+            peaks[k].append(v)
+        else:
+            peaks[k] = [v]
+
+    # delete sweeps with <3 spikes
+    to_pop = []
+    for k in peaks:
+        if len(peaks[k]) < min_peaks:
+            to_pop.append(k)
+    for k in to_pop:
+        peaks.pop(k)
+    if len(peaks) == 0:
+        return None
+
+    # calculate isi
+    isi = dict()
+    for k, v in peaks.items():
+        isi[k] = [x - y for x, y in zip(v[1:], v[:-1])]
+
+    # delete long intervals
+    for k, v in isi.items():
+        for i in range(1, len(v)):
+            if v[i] > v[i-1] * max_isi_ratio:
+                isi[k] = v[:i]
+                break
+
+    # delete sweeps with <2 isi's
+    to_pop = []
+    for k in isi:
+        if len(isi[k]) < 2:
+            to_pop.append(k)
+    for k in to_pop:
+        isi.pop(k)
+    if len(isi) == 0:
+        return None
+
+    # only take the first 3 sweeps with isi data
+    if len(isi) > 3:
+        keys = sorted(list(isi.keys()))[:3]
+        isi = {k: isi[k] for k in isi if k in keys}
+
+    # calculate adaptation
+    adapt = dict()
+    for k, v in isi.items():
+        adapt[k] = [(x-y)/(x+y) for x, y in zip(v[1:], v[:-1])]
+
+    #print(adapt)
+    # take median adaptation from each sweep, then average the 3 sweeps
+    adapt_mean = np.mean([np.median(adapt[k]) for k in adapt])
+
+    return adapt_mean

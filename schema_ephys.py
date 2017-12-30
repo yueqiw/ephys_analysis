@@ -266,37 +266,38 @@ class APandIntrinsicProperties(dj.Imported):
     cell: varchar(128)      # cell id
     recording: varchar(128) # recording file name
     ---
-    has_ap : enum('Yes', 'No')
-    v_baseline = null : float
-    bias_current = null : float
-    tau = null : float
-    capacitance = null : float
-    input_resistance = null : float
-    f_i_curve_slope = null : float
-    max_firing_rate = null : float
+    has_ap : enum('Yes', 'No')  # Yes/No
+    v_baseline = null : float  # mV
+    bias_current = null : float  # pA
+    tau = null : float  #
+    capacitance = null : float  # pF
+    input_resistance = null : float  # MOhm
+    f_i_curve_slope = null : float  # no unit
+    max_firing_rate = null : float  # Hz
 
-    sag = null : float
-    vm_for_sag = null : float
+    sag = null : float  # no unit
+    vm_for_sag = null : float  # mV
 
-    ap_threshold = null : float
-    ap_width = null : float
-    ap_height = null : float
-    ap_peak = null : float
-    ap_trough = null : float
-    ap_trough_to_threshold = null : float
-    ap_upstroke = null : float
-    ap_downstroke = null : float
-    ap_updownstroke_ratio = null : float
+    ap_threshold = null : float  # mV
+    ap_width = null : float  # half height width (peak to trough), ms
+    ap_height = null : float  # peak to trough, mV
+    ap_peak = null : float  # mV
+    ap_trough = null : float  # mV
+    ap_trough_to_threshold = null : float  # AHP amplitude, mV, https://neuroelectro.org/ephys_prop/16/
+    ap_peak_to_threshold = null : float  # spike amplitude, mV, https://neuroelectro.org/ephys_prop/5/
+    ap_upstroke = null : float  # mV/ms
+    ap_downstroke = null : float  # -mV/ms, positive
+    ap_updownstroke_ratio = null : float  # no unit
 
-    hs_firing_rate = null : float
-    hs_adaptation = null : float
-    hs_median_isi = null : float
-    hs_latency = null : float
+    hs_firing_rate = null : float  # Hz
+    hs_adaptation = null : float  # no unit
+    hs_median_isi = null : float  # ms
+    hs_latency = null : float  # ms
 
-    rheobase_index = null : smallint
-    rheobase_stim_amp = null : float
-    hero_sweep_index = null : smallint
-    hero_sweep_stim_amp = null : float
+    rheobase_index = null : smallint  # no unit
+    rheobase_stim_amp = null : float  # pA
+    hero_sweep_index = null : smallint  # no unit
+    hero_sweep_stim_amp = null : float  # pA
 
     all_firing_rate : longblob
     all_stim_amp : longblob
@@ -310,7 +311,10 @@ class APandIntrinsicProperties(dj.Imported):
     spikes_threshold_t : longblob
     spikes_peak_t: longblob
 
+    adapt_avg = null : float  # average adaptation of the 3 sweeps >= 4Hz (1 sec)
+
     """
+
     def _make_tuples(self, key):
         ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
         directory = os.path.expanduser(ephys_exp.pop('directory', None))

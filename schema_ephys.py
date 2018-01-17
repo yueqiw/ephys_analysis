@@ -212,7 +212,7 @@ class EphysRecordings(dj.Imported):
 class CurrentStepTimeParams(dj.Manual):
     definition = """
     # Time window parameters for current injection (account for different protocol settings)
-    experiment: varchar(128)        # excel file names (experiment name)
+    -> EphysExperimentsForAnalysis
     ---
     istep_start: float      # current injection starting time (s)
     istep_end_1s: float     # time after 1st second (s) -- use the 1st second for analysis
@@ -263,6 +263,7 @@ class APandIntrinsicProperties(dj.Imported):
     # Action potential and intrinsic properties from current injections
     -> EphysExperimentsForAnalysis
     -> FeatureExtractionParams
+    -> CurrentStepTimeParams
     cell: varchar(128)      # cell id
     recording: varchar(128) # recording file name
     ---
@@ -354,7 +355,7 @@ class APandIntrinsicProperties(dj.Imported):
 class CurrentStepPlots(dj.Imported):
     definition = """
     # Plot current clamp raw sweeps + detected spikes. Save figures locally. Store file path.
-    -> APandIntrinsicProperties
+    -> APandIntrinsicProperties  # TODO actually does not need to depend on this.
     ---
     gif_path : varchar(256)
     pdf_path : varchar(256)

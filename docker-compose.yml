@@ -1,0 +1,27 @@
+iclamp:
+    build: .
+    dockerfile: Dockerfile
+    ports:
+        - '1235:1235'
+    volumes:
+        - ../data:/app/data
+
+schema:
+    build: .
+    dockerfile: Dockerfile.schema
+    links:
+        - mysql
+    environment:
+        - DJ_USER=root
+        - DJ_HOST=mysql
+        - DJ_PASS=root
+
+mysql:
+    image: 'mariadb'
+    ports:
+        - '3306:3306'
+    volumes:
+        - ./db-data:/var/lib/mysql
+    environment:
+        - MYSQL_ROOT_PASSWORD=root
+        - MYSQL_DATABASE=yueqi_ephys

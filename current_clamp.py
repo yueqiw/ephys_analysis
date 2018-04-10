@@ -12,63 +12,6 @@ from PIL import Image
 
 import allensdk_0_14_2.ephys_features as ft
 
-import stfio
-from stfio import StfIOException
-
-def load_current_step(abf_file, filetype='abf', channels=[0,1], min_voltage=-140):
-    '''
-    Load current clamp recordings from pClamp .abf files
-    min_voltage: None or a number (e.g. -130), traces with min below this voltage are not loaded.
-    '''
-    ch0, ch1 = channels[0], channels[1]
-    try:
-        rec = stfio.read(abf_file)
-    except StfIOException:
-        rec = stfio.read(abf_file[:-4] + '.h5')  # for files converted to h5
-
-    assert((rec[ch0].yunits in ['mV', 'pA']) and (rec[ch1].yunits in ['mV', 'pA']))
-
-    data = OrderedDict()
-    data['file_id'] = os.path.basename(abf_file).strip('.' + filetype)
-    data['file_directory'] = os.path.dirname(abf_file)
-    data['record_date'] = rec.datetime.date()
-    data['record_time'] = rec.datetime.time()
-
-    data['dt'] = rec.dt / 1000
-    data['hz'] = 1./rec.dt * 1000
-    data['time_unit'] = 's'
-
-    data['n_channels'] = len(rec)
-    data['channel_names'] = [rec[x].name for x in channels]
-    data['channel_units'] = [rec[x].yunits for x in channels]
-    data['n_sweeps'] = len(rec[ch0])
-    data['sweep_length'] = len(rec[ch0][0])
-
-    data['t'] = np.arange(0, data['sweep_length']) * data['dt']
-
-    if rec[ch0].yunits == 'mV' and rec[ch1].yunits == 'pA':
-        data['voltage'] = rec[ch0]
-        data['current'] = rec[ch1]
-    elif rec[ch1].yunits == 'mV' and rec[ch0].yunits == 'pA':
-        data['voltage'] = rec[ch1]
-        data['current'] = rec[ch0]
-    else:
-        raise ValueError("channel y-units must be 'mV' or 'pA'.")
-    data['voltage'] = [x.asarray() for x in data['voltage']]
-    data['current'] = [x.asarray() for x in data['current']]
-
-
-    if not min_voltage is None:
-        to_pop = []
-        for i, x in enumerate(data['voltage']):
-            if np.min(x) < min_voltage:
-                to_pop.append(i)
-        data['voltage'] = [x for i, x in enumerate(data['voltage']) if not i in to_pop]
-        data['current'] = [x for i, x in enumerate(data['current']) if not i in to_pop]
-        data['n_sweeps'] -= len(to_pop)
-
-    return data
-
 
 def load_current_step_add_itrace(abf_file, ihold, istart, istep, startend=None, filetype='abf', channels=[0]):
     '''

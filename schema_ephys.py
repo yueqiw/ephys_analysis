@@ -8,7 +8,7 @@ from PIL import Image
 from current_clamp import *
 from current_clamp_features import extract_istep_features
 from read_metadata import *
-
+from file_io import load_current_step
 # from pymysql import IntegrityError
 import datajoint as dj
 schema = dj.schema('yueqi_ephys', locals())
@@ -97,7 +97,7 @@ class PatchCells(dj.Imported):
     rm_est = null: float    # estimated Rm
     v_rest = null: float     # resting membrane potential
     fluor = '': varchar(128)      # fluorescent label
-    fill = 'No': enum('Yes', 'No')  # wether the cell is biocytin filled
+    fill = 'No': enum('yes', 'no', 'unknown', 'out')  # wether the cell is biocytin filled. Out -- cell came out with pipette.
     cell_external = '': varchar(128)   # external if different from sample metadata
     cell_internal = '': varchar(128)   # internal if different from sample metadata
     depth = '': varchar(128)      # microns beneath slice surface
@@ -134,10 +134,11 @@ class PatchCells(dj.Imported):
                 if not pd.isnull(row['internal']): newkey['cell_internal'] = row['internal']
                 if not pd.isnull(row['location']): newkey['location'] = row['location']
                 if not pd.isnull(row['fill']):
-                    if row['fill'].lower() in ['yes', 'no']:
-                        newkey['fill'] = row['fill'].capitalize()
+                    if row['fill'].lower() in ['yes', 'no', 'unknown', 'out']:
+                        newkey['fill'] = row['fill'].lower()
                     else:
                         print('"fill" must be Yes/No. ')
+            print(newkey)
             self.insert1(row=newkey)
         return
 

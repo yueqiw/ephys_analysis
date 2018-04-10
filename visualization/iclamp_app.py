@@ -12,25 +12,30 @@ import pandas as pd
 import seaborn as sns
 import os
 import argparse
+import path
+import json
 
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
 
 from app_utils import *
 
+with open("config.json", 'r') as f:
+    file_paths = json.load(f)
+
 parser = argparse.ArgumentParser(description='Viz for Patch Clamp Electrophysiology')
 parser.add_argument('--data',
-                default=os.path.expanduser('~/Dropbox/Data/organoid/organoid_ephys/'),
+                default=os.path.expanduser(file_paths['data']),
                 type=str, help='Directory for raw data')
 parser.add_argument('--analysis',
-                default=os.path.expanduser('~/Dropbox/Data/organoid/organoid_ephys/analysis/iclamp_2017-09/'),
+                default=os.path.expanduser(file_paths['analysis']),
                 type=str, help='Directory for analysis files')
 args = parser.parse_args()
 
 # load data
 # use pre-computed features stored on local drive (fetched from Datajoint.)
-unique_isteps = pd.read_excel(os.path.join(args.analysis, 'data/unique_isteps_narrow.xlsx'))
-plot_paths = pd.read_csv(os.path.join(args.analysis, 'data/plot_path.csv'))
+unique_isteps = pd.read_excel(os.path.join(args.analysis, 'unique_isteps_narrow.xlsx'))
+plot_paths = pd.read_csv(os.path.join(args.analysis, 'plot_path.csv'))
 #TODO: integrate with datajoint, and fetch data directly from database
 
 def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):

@@ -29,15 +29,17 @@ def load_current_step(abf_file, filetype='abf', channels=[0,1], min_voltage=-140
     if filetype == 'abf':
         try:
             rec = stfio.read(abf_file)
-        except NameError:
+        except:
             use_pkl = True
-    elif filetype == 'pkl' or use_pkl:
+    if filetype == 'pkl' or use_pkl: 
         try:
-            with gzip.open(abf_file[:-4] + '.pkl', 'rb') as handle: # compressed pkl
-                rec = pickle.load(handle) # for files converted to .pkl
+            with gzip.open(abf_file.strip('.' + filetype) + '.pkl', 'rb') as handle: # compressed pkl
+                data = pickle.load(handle, encoding='bytes') # for files converted to .pkl
         except IOError:
-            with open(abf_file[:-4] + '.pkl', 'rb') as handle:  # non-compressed pkl
-                rec = pickle.load(handle) # for files converted to .pkl
+            with open(abf_file.strip('.' + filetype) + '.pkl', 'rb') as handle:  # non-compressed pkl
+                data = pickle.load(handle, encoding='bytes') # for files converted to .pkl
+        data = decode_bytes(data)
+        return data
 
     assert((rec[ch0].yunits in ['mV', 'pA']) and (rec[ch1].yunits in ['mV', 'pA']))
 
@@ -81,6 +83,20 @@ def load_current_step(abf_file, filetype='abf', channels=[0,1], min_voltage=-140
         data['n_sweeps'] -= len(to_pop)
 
     return data
+
+
+def decode_bytes(data):
+    if isinstance(data, bytes):
+        return data.decode('ascii')
+    elif isinstance(data, dict):
+        return dict(map(decode_bytes, data.items()))
+    elif isinstance(data, tuple):
+        return tuple(map(decode_bytes, data))
+    elif isinstance(data, list):
+        return list(map(decode_bytes, data))
+    else:
+        return data
+
 
 def save_data_as_pickle(data, pkl_file, compress=True):
     if compress:

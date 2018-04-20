@@ -264,6 +264,7 @@ class EphysSweepFeatureExtractor:
                 "median_isi": np.median(isis),
                 "first_isi": isis[0] if len(isis) >= 1 else np.nan,
                 "avg_rate": ft.average_rate(t, thresholds, self.start, self.end),
+                "avg_rate_500ms": ft.average_rate(t, thresholds, self.start, self.start + 0.5),
             }
 
         for k, v in six.iteritems(sweep_level_features):
@@ -879,6 +880,8 @@ class EphysCellFeatureExtractor:
             s.set_stimulus_amplitude_calculator(_step_stim_amp)
 
         spiking_indexes = np.flatnonzero(ext.sweep_features("avg_rate"))
+        # to avoid spontaneous spikes, define rheobase and first AP only using the first 500ms.
+        spiking_indexes_500ms = np.flatnonzero(ext.sweep_features("avg_rate_500ms"))
 
         if len(spiking_indexes) == 0:
             self._features["long_squares"]["rheobase_extractor_index"] = None
@@ -891,7 +894,7 @@ class EphysCellFeatureExtractor:
             return
 
         amps = ext.sweep_features("stim_amp")#self.long_squares_stim_amps()
-        min_index = np.argmin(amps[spiking_indexes])
+        min_index = np.argmin(amps[spiking_indexes_500ms]) # to avoid spontaneous spikes after 500ms
         rheobase_index = spiking_indexes[min_index]
         rheobase_i = _step_stim_amp(ext.sweeps()[rheobase_index])
 

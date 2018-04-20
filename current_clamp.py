@@ -62,7 +62,7 @@ def load_current_step_add_itrace(abf_file, ihold, istart, istep, startend=None, 
 
 def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, vlim=[-145,55], ilim=[-95,150],
+                        blue_sweep=None, vlim=[-145,60], ilim=[-95,150],
                         spikes_sweep_id = None, spikes_t = None,
                         bias_current = 0.0, highlight = 'deepskyblue',
                         skip_sweep=1, skip_point=10, save=False):
@@ -154,7 +154,7 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
 
 def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, vlim=[-155,55], ilim=[-95,150],
+                        blue_sweep=None, vlim=[-155,60], ilim=[-95,150],
                         spikes_sweep_id = None, spikes_t = None,
                         bias_current = 0.0, highlight = 'deepskyblue',
                         skip_point=10, save=False, save_filepath=None):
@@ -255,7 +255,7 @@ def plot_fi_curve(stim_amp, firing_rate, save_filepath = None):
 
 
 def plot_first_spike(data, features, time_zero='threshold',
-                    window=None, vlim=[-80, 50], color=sns.color_palette("muted")[2],
+                    window=None, vlim=[-80, 60], color=sns.color_palette("muted")[2],
                     save_filepath = None):
     '''
     Plot the first action potential. Time window is something like:
@@ -306,7 +306,7 @@ def plot_first_spike(data, features, time_zero='threshold',
 
 
 def plot_phase_plane(data, features, filter=None, window=[-50, 200],
-                        vlim=[-85, 50], dvdtlim=[-80, 320],
+                        vlim=[-80, 60], dvdtlim=[-80, 320],
                         color=sns.color_palette("muted")[1],
                         save_filepath=None):
     t0 = features['spikes_threshold_t'][0]

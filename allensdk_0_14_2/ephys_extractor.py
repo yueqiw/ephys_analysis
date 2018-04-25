@@ -248,6 +248,7 @@ class EphysSweepFeatureExtractor:
 
         if len(self._spikes_df) == 0:
             self._sweep_features["avg_rate"] = 0
+            self._sweep_features["avg_rate_500ms"] = 0
             return
 
         thresholds = self._spikes_df["threshold_index"].values.astype(int)
@@ -883,7 +884,7 @@ class EphysCellFeatureExtractor:
         # to avoid spontaneous spikes, define rheobase and first AP only using the first 500ms.
         spiking_indexes_500ms = np.flatnonzero(ext.sweep_features("avg_rate_500ms"))
 
-        if len(spiking_indexes) == 0:
+        if len(spiking_indexes_500ms) == 0:
             self._features["long_squares"]["rheobase_extractor_index"] = None
             self._features["long_squares"]["rheobase_i"] = None
             self._features["long_squares"]["rheobase_sweep"] = {}
@@ -895,13 +896,13 @@ class EphysCellFeatureExtractor:
 
         amps = ext.sweep_features("stim_amp")#self.long_squares_stim_amps()
         min_index = np.argmin(amps[spiking_indexes_500ms]) # to avoid spontaneous spikes after 500ms
-        rheobase_index = spiking_indexes[min_index]
+        rheobase_index = spiking_indexes_500ms[min_index]
         rheobase_i = _step_stim_amp(ext.sweeps()[rheobase_index])
 
         self._features["long_squares"]["rheobase_extractor_index"] = rheobase_index
         self._features["long_squares"]["rheobase_i"] = rheobase_i
         self._features["long_squares"]["rheobase_sweep"] = ext.sweeps()[rheobase_index]
-        spiking_sweeps = [sweep for sweep in ext.sweeps() if sweep.sweep_feature("avg_rate") > 0]
+        spiking_sweeps = [sweep for sweep in ext.sweeps() if sweep.sweep_feature("avg_rate_500ms") > 0]
         self._spiking_long_squares_ext = EphysSweepSetFeatureExtractor.from_sweeps(spiking_sweeps)
         self._features["long_squares"]["spiking_sweeps"] = self._spiking_long_squares_ext.sweeps()
 
@@ -910,7 +911,7 @@ class EphysCellFeatureExtractor:
 
     def _analyze_long_squares_subthreshold(self):
         ext = self._long_squares_ext
-        subthresh_sweeps = [sweep for sweep in ext.sweeps() if sweep.sweep_feature("avg_rate") == 0]
+        subthresh_sweeps = [sweep for sweep in ext.sweeps() if sweep.sweep_feature("avg_rate_500ms") == 0]
         subthresh_ext = EphysSweepSetFeatureExtractor.from_sweeps(subthresh_sweeps)
         self._subthreshold_long_squares_ext = subthresh_ext
 

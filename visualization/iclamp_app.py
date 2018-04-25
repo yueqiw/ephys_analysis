@@ -12,7 +12,7 @@ import pandas as pd
 import seaborn as sns
 import os
 import argparse
-import path
+#import path
 import json
 
 from sklearn import preprocessing
@@ -20,7 +20,7 @@ from sklearn.decomposition import PCA
 
 from app_utils import *
 
-with open("config.json", 'r') as f:
+with open("config.txt", 'r') as f:
     file_paths = json.load(f)
 
 parser = argparse.ArgumentParser(description='Viz for Patch Clamp Electrophysiology')

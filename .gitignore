@@ -1,4 +1,5 @@
 visualization/data/
+visualization/config.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

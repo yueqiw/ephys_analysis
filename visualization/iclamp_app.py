@@ -69,7 +69,8 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     # labels and color maps
     text_labels = ['-'.join([x, y]) for x, y in zip(cells_ap['experiment'], cells_ap['recording'])]
     experiments = cells_ap['experiment'].unique()
-    colors = sns.color_palette("Set2", len(experiments))
+    random.seed(0)
+    colors = random.sample(cluster_colors, len(cluster_colors), )
     exp_lut = dict(zip(experiments, colors))
     idx_color_mapping = cells_ap['experiment'].map(exp_lut)
 

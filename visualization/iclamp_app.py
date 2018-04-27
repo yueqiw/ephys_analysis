@@ -14,6 +14,7 @@ import os
 import argparse
 #import path
 import json
+import random
 
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
@@ -69,6 +70,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     # labels and color maps
     text_labels = ['-'.join([x, y]) for x, y in zip(cells_ap['experiment'], cells_ap['recording'])]
     experiments = cells_ap['experiment'].unique()
+    cluster_colors = sns.hls_palette(len(experiments), l=0.7)
     random.seed(0)
     colors = random.sample(cluster_colors, len(cluster_colors), )
     exp_lut = dict(zip(experiments, colors))

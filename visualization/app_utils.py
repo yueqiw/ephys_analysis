@@ -9,6 +9,8 @@ import matplotlib.patches as mpatches
 import io
 import base64
 
+sns.set()
+
 feature_names = dict(input_resistance='Input Resistance (MOhm)',
                      sag='Sag',
                      capacitance='Membrane Capacitance (pF)',
@@ -45,8 +47,8 @@ def cluster_heatmap(data, features, idx_color_mapping, exp_lut, legend=True):
     #row_linkage = hierarchy.linkage(distance.pdist(correlations_array), method='ward', metric='correlation')
     #col_linkage = hierarchy.linkage(distance.pdist(correlations_array.T), method='ward', metric='correlation')
 
-    g = sns.clustermap(df, method='ward', metric='correlation', center=0,
-                       col_colors = idx_color_mapping, figsize=(20,15))
+    g = sns.clustermap(df, method='ward', metric='euclidean', center=0,
+                       col_colors = idx_color_mapping, figsize=(20,15), cmap='RdBu_r')
     _ = plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize=28)
     _ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=0, fontsize=22)
 

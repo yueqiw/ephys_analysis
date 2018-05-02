@@ -13,6 +13,8 @@ from file_io import load_current_step
 import datajoint as dj
 schema = dj.schema('yueqi_ephys', locals())
 
+FIG_DIR = 'figures'
+
 '''
 class DjImportedFromDirectory(dj.Imported):
     # Subclass of Imported. Initialize with data directory.
@@ -378,9 +380,10 @@ class CurrentStepPlots(dj.Imported):
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
 
-        parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
+        # figures/istep_pics_params-1/2018-03-30_EP2-15/
+        parent_directory = os.path.join(FIG_DIR, 'istep_pics_params-' + str(params_id), key['experiment'])
         if not os.path.exists(os.path.join(directory, parent_directory)):
-            os.mkdir(os.path.join(directory, parent_directory))
+            os.makedirs(os.path.join(directory, parent_directory))
 
         # The fetched features only contain AP time points for the 1st second
         # features = (APandIntrinsicProperties() & key).fetch1()
@@ -439,9 +442,9 @@ class FICurvePlots(dj.Imported):
         print('Populating for: ' + key['experiment'] + ' ' + rec)
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
-        parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
+        parent_directory = os.path.join(FIG_DIR, 'istep_pics_params-' + str(params_id), key['experiment'])
         if not os.path.exists(os.path.join(directory, parent_directory)):
-            os.mkdir(os.path.join(directory, parent_directory))
+            os.makedirs(os.path.join(directory, parent_directory))
         for filetype in ['fi_png', 'fi_svg']:
             target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
@@ -481,9 +484,9 @@ class FirstSpikePlots(dj.Imported):
         print('Populating for: ' + key['experiment'] + ' ' + rec)
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
-        parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
+        parent_directory = os.path.join(FIG_DIR, 'istep_pics_params-' + str(params_id), key['experiment'])
         if not os.path.exists(os.path.join(directory, parent_directory)):
-            os.mkdir(os.path.join(directory, parent_directory))
+            os.makedirs(os.path.join(directory, parent_directory))
         for filetype in ['spike_png', 'spike_svg']:
             target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
@@ -524,9 +527,9 @@ class PhasePlanes(dj.Imported):
         print('Populating for: ' + key['experiment'] + ' ' + rec)
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
-        parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
+        parent_directory = os.path.join(FIG_DIR, 'istep_pics_params-' + str(params_id), key['experiment'])
         if not os.path.exists(os.path.join(directory, parent_directory)):
-            os.mkdir(os.path.join(directory, parent_directory))
+            os.makedirs(os.path.join(directory, parent_directory))
         for filetype in ['phase_png', 'phase_svg']:
             target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
@@ -578,7 +581,7 @@ class CombinedPlots(dj.Imported):
         print('Populating for: ' + key['experiment'] + ' ' + rec)
         params = (FeatureExtractionParams() & key).fetch1()
         params_id = params.pop('params_id', None)
-        parent_directory = os.path.join(key['experiment'], 'istep_pics_params-' + str(params_id))
+        parent_directory = os.path.join(FIG_DIR, 'istep_pics_params-' + str(params_id), key['experiment'])
 
         left_large = combine_vertical([Image.open(os.path.join(directory, x)) for x in [fi, spike, phase]], scale=1)
         left_mid = left_large.resize([int(x * 0.5) for x in left_large.size], resample=Image.BICUBIC)

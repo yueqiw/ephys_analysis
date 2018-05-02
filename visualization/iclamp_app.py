@@ -14,14 +14,16 @@ import pandas as pd
 import seaborn as sns
 import os
 import argparse
+#import path
 import json
+import random
 
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
 
 from app_utils import *
 
-with open("config.json", 'r') as f:
+with open("config.txt", 'r') as f:
     file_paths = json.load(f)
 
 parser = argparse.ArgumentParser(description='Viz for Patch Clamp Electrophysiology')
@@ -70,7 +72,9 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     # labels and color maps
     text_labels = ['-'.join([x, y]) for x, y in zip(cells_ap['experiment'], cells_ap['recording'])]
     experiments = cells_ap['experiment'].unique()
-    colors = sns.color_palette("Set2", len(experiments))
+    cluster_colors = sns.hls_palette(len(experiments), l=0.7)
+    random.seed(0)
+    colors = random.sample(cluster_colors, len(cluster_colors), )
     exp_lut = dict(zip(experiments, colors))
     idx_color_mapping = cells_ap['experiment'].map(exp_lut)
 

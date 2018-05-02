@@ -1,0 +1,24 @@
+FROM python:3.6-jessie
+
+WORKDIR /app
+
+COPY requirements-schema.txt /app
+RUN pip install -r /app/requirements-schema.txt
+
+COPY allensdk_0_14_2 /app/allensdk_0_14_2
+#COPY assets /app/assets
+#COPY visualization /app/visualization
+COPY *.py /app/
+
+#RUN mkdir /app/data
+#VOLUME /app/data
+
+
+#COPY config.json /app
+#COPY run.sh /app
+
+ENV DJ_USER root
+ENV DJ_HOST localhost
+ENV DJ_PASS secret
+
+CMD python schema_ephys.py

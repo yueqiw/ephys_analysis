@@ -6,6 +6,8 @@ from dash.dependencies import Input, Output
 
 import plotly.graph_objs as go
 import plotly.tools as tls
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -450,4 +452,4 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
 
 if __name__ == '__main__':
     app = iclamp_viz()
-    app.run_server(port=1235, debug=True)
+    app.run_server(host='0.0.0.0', port=1235, debug=True)

@@ -45,7 +45,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     # subset cells with and without action potentials
     cells_all = unique_isteps[[x for x in unique_isteps.columns if x != 'duplicates']]
     cells_ap = cells_all[(cells_all['has_ap'] == 'Yes') & (cells_all['hs_firing_rate'] >0)].reset_index(drop=True)
-    cells_ap = cells_ap[cells_ap['cm_est'] < 75].reset_index(drop=True)  # remove outlier
+    # cells_ap = cells_ap[cells_ap['cm_est'] < 75].reset_index(drop=True)  # no need to remove outlier
     # cells_noap = cells_all[cells_all['has_ap'] == 'No'].reset_index(drop=True)
 
     # select useful features
@@ -151,7 +151,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                 html.H3('Hierarchical clustering heatmap', style={'font-family':'helvetica', 'font-weight':'normal'}),
                 html.Img(id='cell_feature_heatmap', src=decoded_heatmap,
                         style={'height': '100%'})
-                ], style={'width': '42%', 'height': '100%', 'display': 'inline-block'}),
+                ], style={'width': '60%', 'height': '100%', 'display': 'inline-block'}),
             html.Div([
                 dcc.Graph(id='cell_bar',
                         style={'height': '100%'})

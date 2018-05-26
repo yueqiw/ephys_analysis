@@ -48,9 +48,9 @@ def cluster_heatmap(data, features, idx_color_mapping, exp_lut, legend=True):
     #col_linkage = hierarchy.linkage(distance.pdist(correlations_array.T), method='ward', metric='correlation')
 
     g = sns.clustermap(df, method='ward', metric='euclidean', center=0,
-                       col_colors = idx_color_mapping, figsize=(20,15), cmap='RdBu_r')
+                       col_colors = idx_color_mapping, figsize=(30,15), cmap='RdBu_r')
     _ = plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize=28)
-    _ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=0, fontsize=22)
+    _ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=0, fontsize=18)
 
     if legend:
         legend_patches = []

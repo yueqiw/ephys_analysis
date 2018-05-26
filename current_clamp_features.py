@@ -164,7 +164,7 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
 
 
 def calculate_adapt(spikes_sweep_id, spikes_peak_t, start, end, adapt_interval=1.0,
-                    min_peaks=4, max_isi_ratio=2.5, firing_rate_target=None):
+                    min_peaks=3, max_isi_ratio=2.5, firing_rate_target=None):
     if len(spikes_sweep_id) == 0:
         return None
     end_adapt = start + adapt_interval

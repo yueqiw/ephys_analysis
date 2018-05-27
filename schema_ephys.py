@@ -249,14 +249,16 @@ class FeatureExtractionParams(dj.Lookup):
     # Parameters for AllenSDK action potential detection algorithm
     params_id : int        # unique id for parameter set
     ---
-    dv_cutoff = 10 : float          # minimum dV/dt to qualify as a spike in V/s (optional, default 20)
-    max_interval = 0.01 : float     # maximum acceptable time between start of spike and time of peak in sec (optional, default 0.005)
+    dv_cutoff = 5 : float          # minimum dV/dt to qualify as a spike in V/s (optional, default 20)
+    max_interval = 0.02 : float     # maximum acceptable time between start of spike and time of peak in sec (optional, default 0.005)
     min_height = 5 : float         # minimum acceptable height from threshold to peak in mV (optional, default 2)
     min_peak = -30 : float          # minimum acceptable absolute peak level in mV (optional, default -30)
     thresh_frac = 0.05 : float      # fraction of average upstroke for threshold calculation (optional, default 0.05)
     baseline_interval = 0.1 : float     # interval length for baseline voltage calculation (before start if start is defined, default 0.1)
     baseline_detect_thresh = 0.3 : float    # dV/dt threshold for evaluating flatness of baseline region (optional, default 0.3)
-    subthresh_min_amp = -50 : float         # minimum subthreshold current, not related to spike detection.
+    subthresh_min_amp = -80 : float         # minimum subthreshold current, not related to spike detection.
+    n_subthres_sweeps = 4 : float          # number of hyperpolarizing sweeps for calculating Rin and Tau.
+    sag_target = -100 : float           # Use the sweep with peak Vm closest to this number to calculate Sag.
     """
 
 
@@ -394,7 +396,7 @@ class CurrentStepPlots(dj.Imported):
 
         fig = plot_current_step(data, fig_height=6, startend=[istep_start, istep_end],
                                 offset=[0.2, 0.4], skip_sweep=1,
-                                blue_sweep=features['hero_sweep_index'],
+                                blue_sweep=features['hero_sweep_index'], red_sweep=features['rheobase_index'],
                                 spikes_t = features['spikes_peak_t'],
                                 spikes_sweep_id = features['spikes_sweep_id'],
                                 bias_current = features['bias_current'],

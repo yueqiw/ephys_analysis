@@ -62,9 +62,9 @@ def load_current_step_add_itrace(abf_file, ihold, istart, istep, startend=None, 
 
 def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, vlim=[-145,60], ilim=[-95,150],
+                        blue_sweep=None, red_sweep=None, vlim=[-145,60], ilim=[-95,150],
                         spikes_sweep_id = None, spikes_t = None,
-                        bias_current = 0.0, highlight = 'deepskyblue',
+                        bias_current = 0.0, highlight = 'deepskyblue', highlight_red=sns.color_palette("muted")[2],
                         skip_sweep=1, skip_point=10, save=False):
     '''
     Plot overlayed sweeps in current clamp protocol, with one sweep in blue color
@@ -108,7 +108,17 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
     else:
         blue_sweep = indices[-2]
 
+    if red_sweep is not None:
+        assert(type(red_sweep) is int)
+        if not red_sweep in indices:
+            indices.append(red_sweep)
+
     for i in indices:
+        if i == red_sweep:
+            color = highlight_red
+            lw=1.25
+            size=8
+            alpha=1
         if i == blue_sweep or i == data['n_sweeps'] + blue_sweep:
             color = highlight
             lw=1.25

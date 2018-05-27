@@ -409,7 +409,7 @@ class EphysSweepFeatureExtractor:
             logging.info("Could not find sufficiently flat interval for automatic baseline voltage", RuntimeWarning)
             return np.nan
 
-    def voltage_deflection(self, deflect_type=None):
+    def voltage_deflection(self, deflect_type=None, peak_range=None):
         """Measure deflection (min or max, between start and end if specified).
 
         Parameters
@@ -438,8 +438,12 @@ class EphysSweepFeatureExtractor:
         end = self.end
         if not end:
             end = self.t[-1]
-        end_index = ft.find_time_index(self.t, end)
 
+        # for Sag current, only get peak in the first, say 500ms
+        if not peak_range is None:
+            end = start + peak_range
+        #print(start, end, peak_range) # DEBUG
+        end_index = ft.find_time_index(self.t, end)
 
         if deflect_type is None:
             if self.i is not None:
@@ -496,12 +500,13 @@ class EphysSweepFeatureExtractor:
             return np.nan
         return 1. / inv_tau
 
-    def estimate_sag(self, peak_width=0.005):
+    def estimate_sag(self, peak_width=0.005, peak_range=0.5):
         """Calculate the sag in a hyperpolarizing voltage response.
 
         Parameters
         ----------
         peak_width : window width to get more robust peak estimate in sec (default 0.005)
+        peak_range : the first e.g. 500ms is used for calculating peak deflection
 
         Returns
         -------
@@ -519,12 +524,15 @@ class EphysSweepFeatureExtractor:
         if not end:
             end = self.t[-1]
 
-        v_peak, peak_index = self.voltage_deflection("min")
+        # only use the first peak_range=0.5 s to calculate peak deflection
+        v_peak, peak_index = self.voltage_deflection("min", peak_range=peak_range)
         v_peak_avg = ft.average_voltage(v, t, start=t[peak_index] - peak_width / 2.,
                                       end=t[peak_index] + peak_width / 2.)
         v_baseline = self.sweep_feature("v_baseline")
         v_steady = ft.average_voltage(v, t, start=end - self.baseline_interval, end=end)
         sag = (v_peak_avg - v_steady) / (v_peak_avg - v_baseline)
+        if sag < 0:
+            sag = 0  # set negative sag to zero
         return sag
 
     def spikes(self):
@@ -768,9 +776,9 @@ class EphysSweepSetFeatureExtractor:
 class EphysCellFeatureExtractor:
     # Class constants for specific processing
     SUBTHRESH_MAX_AMP = 0
-    SAG_TARGET = -100.
 
-    def __init__(self, ramps_ext, short_squares_ext, long_squares_ext, subthresh_min_amp=-100):
+    def __init__(self, ramps_ext, short_squares_ext, long_squares_ext,
+                 subthresh_min_amp=-100, n_subthres_sweeps=4, sag_target = -100.):
         """Initialize EphysCellFeatureExtractor object from EphysSweepSetExtractors for
         ramp, short square, and long square sweeps.
 
@@ -787,6 +795,8 @@ class EphysCellFeatureExtractor:
         self._long_squares_ext = long_squares_ext
 
         self._subthresh_min_amp = subthresh_min_amp
+        self._n_subthres_sweeps = n_subthres_sweeps
+        self._sag_target = sag_target
 
         self._features = {
             "ramps": {},
@@ -921,20 +931,26 @@ class EphysCellFeatureExtractor:
         peaks = subthresh_ext.sweep_features("peak_deflect")
         sags = subthresh_ext.sweep_features("sag")
         sag_eval_levels = np.array([sweep.voltage_deflection()[0] for sweep in subthresh_ext.sweeps()])
-        target_level = self.SAG_TARGET
-        closest_index = np.argmin(np.abs(sag_eval_levels - target_level))
-        self._features["long_squares"]["sag"] = sags[closest_index]
+        target_level = self._sag_target
+        # use the two sweeps closest to the target level to calculate Sag
+        closest_index = np.argsort(np.abs(sag_eval_levels - target_level))[:2]
+        self._features["long_squares"]["sag"] = np.mean(sags[closest_index])
         self._features["long_squares"]["vm_for_sag"] = sag_eval_levels[closest_index]
         self._features["long_squares"]["subthreshold_sweeps"] = subthresh_ext.sweeps()
         for s in self._features["long_squares"]["subthreshold_sweeps"]:
             s.set_stimulus_amplitude_calculator(_step_stim_amp)
 
-        # print("subthresh_sweeps", len(subthresh_sweeps)) # DEBUG
+        #print(self._features["long_squares"]["sag"])
+        #print(self._features["long_squares"]["vm_for_sag"])
+
+        #print("subthresh_sweeps", len(subthresh_sweeps)) # DEBUG
         calc_subthresh_sweeps = [sweep for sweep in subthresh_sweeps if
                                  sweep.sweep_feature("stim_amp") < 0 and
                                  sweep.sweep_feature("stim_amp") > self._subthresh_min_amp]
-
-        # print("calc_subthresh_sweeps", len(calc_subthresh_sweeps)) # DEBUG
+        calc_subthresh_sweeps = sorted(calc_subthresh_sweeps, key=lambda x: x.sweep_feature("stim_amp"))
+        calc_subthresh_sweeps = calc_subthresh_sweeps[-self._n_subthres_sweeps:]
+        #print([sweep.sweep_feature("stim_amp") for sweep in calc_subthresh_sweeps])
+        #print("calc_subthresh_sweeps", len(calc_subthresh_sweeps)) # DEBUG
         calc_subthresh_ext = EphysSweepSetFeatureExtractor.from_sweeps(calc_subthresh_sweeps)
         self._subthreshold_membrane_property_ext = calc_subthresh_ext
         self._features["long_squares"]["subthreshold_membrane_property_sweeps"] = calc_subthresh_ext.sweeps()
@@ -942,6 +958,9 @@ class EphysCellFeatureExtractor:
         self._features["long_squares"]["tau"] = membrane_time_constant(calc_subthresh_ext)
         self._features["long_squares"]["v_baseline"] = np.nanmean(ext.sweep_features("v_baseline"))
         self._features["long_squares"]["bias_current"] = np.nanmean(ext.sweep_features("i_baseline"))
+
+        #print(self._features["long_squares"]["input_resistance"])
+        #print(self._features["long_squares"]["tau"])
 
     def long_squares_features(self, option=None):
         option_table = {

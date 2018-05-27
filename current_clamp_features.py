@@ -6,18 +6,19 @@ from allensdk_0_14_2 import ephys_extractor as efex
 from allensdk_0_14_2 import ephys_features as ft
 
 
-def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delta_mV = 10,
-                            filter=10., dv_cutoff=10., max_interval=0.01, min_height=5.,
+def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthres_sweeps = 4,
+                            sag_target = -100, hero_delta_mV = 10,
+                            filter=10., dv_cutoff=5., max_interval=0.02, min_height=5.,
                             min_peak=-30., thresh_frac=0.05, baseline_interval=0.1,
-                            baseline_detect_thresh=0.3):
+                            baseline_detect_thresh = 0.3):
 
     '''
     Compute the cellular ephys features from square pulse current injections.
 
     Note that some default params are different from AllenSDK.
-    dv_cutoff 20 -> 10 to catch slower APs in immature neurons.
+    dv_cutoff 20 -> 6 to catch slower APs in immature neurons.
     max_interval 0.005 -> 0.01 to catch slower APs.
-    min_height 2 -> 10 to reduce false positive due to relaxed dv_cutoff
+    min_height 2 -> 5 to reduce false positive due to relaxed dv_cutoff
     min_peak -30 -> -25
     '''
     if filter * 1000 >= data['hz']:
@@ -37,7 +38,9 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, hero_delt
 
     # only extract long_sqaures features
     fex = efex.EphysCellFeatureExtractor(None, None, istep_ext,
-                                            subthresh_min_amp=subthresh_min_amp)
+                                            subthresh_min_amp=subthresh_min_amp,
+                                            n_subthres_sweeps=n_subthres_sweeps,
+                                            sag_target=sag_target)
     fex.process(keys = "long_squares")
 
     # To make dict-conversion work

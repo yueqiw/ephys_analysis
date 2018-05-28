@@ -13,7 +13,7 @@ from file_io import load_current_step
 import datajoint as dj
 schema = dj.schema('yueqi_ephys', locals())
 
-FIG_DIR = 'figures'
+FIG_DIR = 'analysis_current_clamp/figures_plot_recording'
 
 '''
 class DjImportedFromDirectory(dj.Imported):
@@ -249,15 +249,15 @@ class FeatureExtractionParams(dj.Lookup):
     # Parameters for AllenSDK action potential detection algorithm
     params_id : int        # unique id for parameter set
     ---
-    dv_cutoff = 5 : float          # minimum dV/dt to qualify as a spike in V/s (optional, default 20)
+    dv_cutoff = 4 : float          # minimum dV/dt to qualify as a spike in V/s (optional, default 20)
     max_interval = 0.02 : float     # maximum acceptable time between start of spike and time of peak in sec (optional, default 0.005)
-    min_height = 5 : float         # minimum acceptable height from threshold to peak in mV (optional, default 2)
-    min_peak = -30 : float          # minimum acceptable absolute peak level in mV (optional, default -30)
+    min_height = 10 : float         # minimum acceptable height from threshold to peak in mV (optional, default 2)
+    min_peak = -20 : float          # minimum acceptable absolute peak level in mV (optional, default -30)
     thresh_frac = 0.05 : float      # fraction of average upstroke for threshold calculation (optional, default 0.05)
     baseline_interval = 0.1 : float     # interval length for baseline voltage calculation (before start if start is defined, default 0.1)
     baseline_detect_thresh = 0.3 : float    # dV/dt threshold for evaluating flatness of baseline region (optional, default 0.3)
     subthresh_min_amp = -80 : float         # minimum subthreshold current, not related to spike detection.
-    n_subthres_sweeps = 4 : float          # number of hyperpolarizing sweeps for calculating Rin and Tau.
+    n_subthres_sweeps = 4 : smallint          # number of hyperpolarizing sweeps for calculating Rin and Tau.
     sag_target = -100 : float           # Use the sweep with peak Vm closest to this number to calculate Sag.
     """
 
@@ -282,7 +282,7 @@ class APandIntrinsicProperties(dj.Imported):
     max_firing_rate = null : float  # Hz
 
     sag = null : float  # no unit
-    vm_for_sag = null : float  # mV
+    vm_for_sag = null : longblob  # mV
 
     ap_threshold = null : float  # mV
     ap_width = null : float  # half height width (peak to trough), ms
@@ -316,6 +316,7 @@ class APandIntrinsicProperties(dj.Imported):
     spikes_sweep_id : longblob
     spikes_threshold_t : longblob
     spikes_peak_t: longblob
+    spikes_trough_t: longblob
 
     adapt_avg = null : float  # average adaptation of the 3 sweeps >= 4Hz (1 sec)
 
@@ -362,10 +363,10 @@ class CurrentStepPlots(dj.Imported):
     # Plot current clamp raw sweeps + detected spikes. Save figures locally. Store file path.
     -> APandIntrinsicProperties  # TODO actually does not need to depend on this.
     ---
-    gif_path : varchar(256)
-    pdf_path : varchar(256)
-    svg_path : varchar(256)
-    png_path : varchar(256)
+    istep_gif_path : varchar(256)
+    istep_pdf_path : varchar(256)
+    istep_svg_path : varchar(256)
+    istep_png_path : varchar(256)
     """
 
     def _make_tuples(self, key):
@@ -388,36 +389,37 @@ class CurrentStepPlots(dj.Imported):
             os.makedirs(os.path.join(directory, parent_directory))
 
         # The fetched features only contain AP time points for the 1st second
-        # features = (APandIntrinsicProperties() & key).fetch1()
-        # recalculate APs using the entire current step
+        features_1s = (APandIntrinsicProperties() & key).fetch1()
+        # To get all spike times, recalculate APs using the entire current step
         _ , features = \
                     extract_istep_features(data, start=istep_start, end=istep_end,
                     **params)
 
         fig = plot_current_step(data, fig_height=6, startend=[istep_start, istep_end],
                                 offset=[0.2, 0.4], skip_sweep=1,
-                                blue_sweep=features['hero_sweep_index'], red_sweep=features['rheobase_index'],
+                                blue_sweep=features_1s['hero_sweep_index'], rheobase_sweep=features_1s['rheobase_index'],
                                 spikes_t = features['spikes_peak_t'],
                                 spikes_sweep_id = features['spikes_sweep_id'],
                                 bias_current = features['bias_current'],
+                                other_features = features,
                                 save=False)
         for filetype in ['png', 'pdf', 'svg', 'gif']:
-            target_folder = os.path.join(directory, parent_directory, filetype)
+            target_folder = os.path.join(directory, parent_directory, 'istep_' + filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
         for filetype in ['png', 'pdf', 'svg']:
-            target_folder = os.path.join(parent_directory, filetype)
-            key[filetype + '_path'] = os.path.join(target_folder, rec + '.' + filetype)
-            fig.savefig(os.path.join(directory, key[filetype + '_path']), dpi=300)
+            target_folder = os.path.join(parent_directory, 'istep_' + filetype)
+            key['istep_' + filetype + '_path'] = os.path.join(target_folder, rec + '.' + filetype)
+            fig.savefig(os.path.join(directory, key['istep_' + filetype + '_path']), dpi=300)
         plt.show()
 
-        key['gif_path'] = os.path.join(parent_directory, 'gif', rec + '.gif')
+        key['istep_gif_path'] = os.path.join(parent_directory, 'istep_gif', rec + '.gif')
         anim = animate_current_step(data, fig_height=6, startend=[istep_start, istep_end], offset=[0.2, 0.4],
                             spikes_t = features['spikes_peak_t'],
                             spikes_sweep_id = features['spikes_sweep_id'],
                             bias_current = features['bias_current'],
                             save=True,
-                            save_filepath = os.path.join(directory, key['gif_path']))
+                            save_filepath = os.path.join(directory, key['istep_gif_path']))
         plt.close(anim)
         self.insert1(row=key)
         return
@@ -431,6 +433,7 @@ class FICurvePlots(dj.Imported):
     ---
     fi_svg_path = '' : varchar(256)
     fi_png_path = '' : varchar(256)
+    fi_pdf_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
         ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
@@ -447,7 +450,7 @@ class FICurvePlots(dj.Imported):
         parent_directory = os.path.join(FIG_DIR, 'istep_pics_params-' + str(params_id), key['experiment'])
         if not os.path.exists(os.path.join(directory, parent_directory)):
             os.makedirs(os.path.join(directory, parent_directory))
-        for filetype in ['fi_png', 'fi_svg']:
+        for filetype in ['fi_png', 'fi_svg', 'fi_pdf']:
             target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
@@ -458,8 +461,10 @@ class FICurvePlots(dj.Imported):
         fi_curve = plot_fi_curve(features['all_stim_amp'], features['all_firing_rate'])
         key['fi_png_path'] = os.path.join(parent_directory, 'fi_png', 'fi_' + rec + '.png')
         key['fi_svg_path'] = os.path.join(parent_directory, 'fi_svg', 'fi_' + rec + '.svg')
+        key['fi_pdf_path'] = os.path.join(parent_directory, 'fi_pdf', 'fi_' + rec + '.pdf')
         fi_curve.savefig(os.path.join(directory, key['fi_png_path']), dpi=300)
         fi_curve.savefig(os.path.join(directory, key['fi_svg_path']))
+        fi_curve.savefig(os.path.join(directory, key['fi_pdf_path']))
         plt.show()
         self.insert1(row=key)
         return
@@ -473,6 +478,7 @@ class FirstSpikePlots(dj.Imported):
     ---
     spike_svg_path = '' : varchar(256)
     spike_png_path = '' : varchar(256)
+    spike_pdf_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
         ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
@@ -489,7 +495,7 @@ class FirstSpikePlots(dj.Imported):
         parent_directory = os.path.join(FIG_DIR, 'istep_pics_params-' + str(params_id), key['experiment'])
         if not os.path.exists(os.path.join(directory, parent_directory)):
             os.makedirs(os.path.join(directory, parent_directory))
-        for filetype in ['spike_png', 'spike_svg']:
+        for filetype in ['spike_png', 'spike_svg', 'spike_pdf']:
             target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
@@ -501,8 +507,10 @@ class FirstSpikePlots(dj.Imported):
         first_spike = plot_first_spike(data, features, time_zero='threshold')
         key['spike_png_path'] = os.path.join(parent_directory, 'spike_png', 'spike_' + rec + '.png')
         key['spike_svg_path'] = os.path.join(parent_directory, 'spike_svg', 'spike_' + rec + '.svg')
+        key['spike_pdf_path'] = os.path.join(parent_directory, 'spike_pdf', 'spike_' + rec + '.pdf')
         first_spike.savefig(os.path.join(directory, key['spike_png_path']), dpi=300)
         first_spike.savefig(os.path.join(directory, key['spike_svg_path']))
+        first_spike.savefig(os.path.join(directory, key['spike_pdf_path']))
         plt.show()
         self.insert1(row=key)
         return
@@ -516,6 +524,7 @@ class PhasePlanes(dj.Imported):
     ---
     phase_svg_path = '' : varchar(256)
     phase_png_path = '' : varchar(256)
+    phase_pdf_path = '' : varchar(256)
     """
     def _make_tuples(self, key):
         ephys_exp = (EphysExperimentsForAnalysis() & key).fetch1()
@@ -532,7 +541,7 @@ class PhasePlanes(dj.Imported):
         parent_directory = os.path.join(FIG_DIR, 'istep_pics_params-' + str(params_id), key['experiment'])
         if not os.path.exists(os.path.join(directory, parent_directory)):
             os.makedirs(os.path.join(directory, parent_directory))
-        for filetype in ['phase_png', 'phase_svg']:
+        for filetype in ['phase_png', 'phase_svg', 'phase_pdf']:
             target_folder = os.path.join(directory, parent_directory, filetype)
             if not os.path.exists(target_folder):
                 os.mkdir(target_folder)
@@ -544,8 +553,10 @@ class PhasePlanes(dj.Imported):
         phase_plane = plot_phase_plane(data, features, filter=0.005)
         key['phase_png_path'] = os.path.join(parent_directory, 'phase_png', 'phase_' + rec + '.png')
         key['phase_svg_path'] = os.path.join(parent_directory, 'phase_svg', 'phase_' + rec + '.svg')
+        key['phase_pdf_path'] = os.path.join(parent_directory, 'phase_pdf', 'phase_' + rec + '.pdf')
         phase_plane.savefig(os.path.join(directory, key['phase_png_path']), dpi=300)
         phase_plane.savefig(os.path.join(directory, key['phase_svg_path']))
+        phase_plane.savefig(os.path.join(directory, key['phase_pdf_path']))
         plt.show()
         self.insert1(row=key)
         return
@@ -574,7 +585,7 @@ class CombinedPlots(dj.Imported):
         fi = (FICurvePlots() & key).fetch1('fi_png_path')
         spike = (FirstSpikePlots() & key).fetch1('spike_png_path')
         phase = (PhasePlanes() & key).fetch1('phase_png_path')
-        istep = (CurrentStepPlots() & key).fetch1('png_path')
+        istep = (CurrentStepPlots() & key).fetch1('istep_png_path')
         if not (fi and spike and phase and istep):
             self.insert1(row=key)
             return

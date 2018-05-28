@@ -111,9 +111,12 @@ class EphysSweepFeatureExtractor:
         putative_spikes = ft.detect_putative_spikes(v, t, self.start, self.end,
                                                     self.filter, self.dv_cutoff)
         peaks = ft.find_peak_indexes(v, t, putative_spikes, self.end)
+        #print("")
+        #print(putative_spikes, peaks)
         putative_spikes, peaks = ft.filter_putative_spikes(v, t, putative_spikes, peaks,
-                                                           self.min_height, self.min_peak)
-
+                                                           self.min_height, self.min_peak,
+                                                           dvdt=dvdt, filter=self.filter)
+        #print(putative_spikes, peaks)
         if not putative_spikes.size:
             # Save time if no spikes detected
             self._spikes_df = DataFrame()
@@ -128,7 +131,7 @@ class EphysSweepFeatureExtractor:
             # Save time if no spikes detected
             self._spikes_df = DataFrame()
             return
-
+        #print(thresholds, peaks, upstrokes, clipped)
         # Spike list and thresholds have been refined - now find other features
         upstrokes = ft.find_upstroke_indexes(v, t, thresholds, peaks, self.filter, dvdt)
         troughs = ft.find_trough_indexes(v, t, thresholds, peaks, clipped, self.end)
@@ -136,7 +139,7 @@ class EphysSweepFeatureExtractor:
         trough_details, clipped = ft.analyze_trough_details(v, t, thresholds, peaks, clipped, self.end,
                                                             self.filter, dvdt=dvdt)
         widths = ft.find_widths(v, t, thresholds, peaks, trough_details[1], clipped)
-
+        #print(thresholds, peaks, upstrokes, clipped)
         base_clipped_list = []
 
         # Points where we care about t, v, and i if available
@@ -1048,7 +1051,7 @@ def input_resistance(ext):
         i = np.append(i, 0.)
 
     A = np.vstack([i, np.ones_like(i)]).T
-    m, c = np.linalg.lstsq(A, v)[0]
+    m, c = np.linalg.lstsq(A, v, rcond=None)[0]
 
     return m * 1e3
 
@@ -1072,18 +1075,19 @@ def fit_fi_slope(ext, last_subthres_stim_amp):
     x = np.concatenate([np.array([last_subthres_stim_amp]), x])
     y = np.concatenate([np.zeros(1), ext.sweep_features("avg_rate")])
 
-    # only fit the monotonically increasing part of the f-i curve
-    # sometimees too much current injection stops the cell from firing.
-    for i in range(1,len(y)):
-        if y[i] <= y[i-1]:
-            i -= 1
-            break
-    y = y[:i+1]
-    x = x[:i+1]
-    print(x)
+    # only fit the part of the f-i curve until maximum firing rate
+    # sometimes too much current injection stops the cell from firing.
+    max_idx = np.argmax(y)
+    max_y = y[max_idx]
+    if max_y < 2:
+        return 0
+    y = y[:max_idx+1]
+    x = x[:max_idx+1]
 
     A = np.vstack([x, np.ones_like(x)]).T
-    m, c = np.linalg.lstsq(A, y)[0]
+    m, c = np.linalg.lstsq(A, y, rcond=None)[0]
+
+    print(y, m)
 
     return m
 

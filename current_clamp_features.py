@@ -9,7 +9,7 @@ from allensdk_0_14_2 import ephys_features as ft
 def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthres_sweeps = 4,
                             sag_target = -100, hero_delta_mV = 10,
                             filter=10., dv_cutoff=5., max_interval=0.02, min_height=5.,
-                            min_peak=-30., thresh_frac=0.05, baseline_interval=0.1,
+                            min_peak=-20., thresh_frac=0.05, baseline_interval=0.1,
                             baseline_detect_thresh = 0.3):
 
     '''
@@ -18,8 +18,8 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
     Note that some default params are different from AllenSDK.
     dv_cutoff 20 -> 6 to catch slower APs in immature neurons.
     max_interval 0.005 -> 0.01 to catch slower APs.
-    min_height 2 -> 5 to reduce false positive due to relaxed dv_cutoff
-    min_peak -30 -> -25
+    min_height 2 -> 10 to reduce false positive due to relaxed dv_cutoff
+    min_peak -30 -> -20
     '''
     if filter * 1000 >= data['hz']:
         filter = None
@@ -94,18 +94,16 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
     cell_features['hero_sweep_index'] = cell_features['hero_sweep']['id'] if hero_sweep else None
     cell_features['first_spike'] = first_spike if has_AP else None
 
-    spikes_sweep_id = []
-    spikes_threshold_t = []
-    spikes_peak_t = []
-    for swp in cell_features['spiking_sweeps']:
-        for spike in swp['spikes']:
-            spikes_threshold_t.append(spike['threshold_t'])
-            spikes_sweep_id.append(swp['id'])
-            spikes_peak_t.append(spike['peak_t'])
 
-    spikes_threshold_t = np.array(spikes_threshold_t)
-    spikes_sweep_id = np.array(spikes_sweep_id)
-    spikes_peak_t = np.array(spikes_peak_t)
+    spikes_sweep_id = np.array([swp['id'] for swp in cell_features['spiking_sweeps'] for spike in swp['spikes']])
+    all_spikes = [spike for swp in cell_features['spiking_sweeps'] for spike in swp['spikes']]
+    
+    spikes_threshold_t = np.array([spike['threshold_t'] for spike in all_spikes])
+    spikes_peak_t = np.array([spike['peak_t'] for spike in all_spikes])
+    spikes_trough_t = np.array([spike['trough_t'] for spike in all_spikes])
+    spikes_threshold_v = np.array([spike['threshold_v'] for spike in all_spikes])
+    spikes_peak_v = np.array([spike['peak_v'] for spike in all_spikes])
+    spikes_trough_v = np.array([spike['trough_v'] for spike in all_spikes])
 
     adapt_avg = calculate_adapt(spikes_sweep_id, spikes_peak_t, start, end,
                                     adapt_interval=1.0, max_isi_ratio=2.5)
@@ -159,6 +157,10 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
                         ('spikes_sweep_id', spikes_sweep_id),
                         ('spikes_threshold_t', spikes_threshold_t),
                         ('spikes_peak_t', spikes_peak_t),
+                        ('spikes_trough_t', spikes_trough_t),
+                        ('spikes_threshold_v', spikes_threshold_v),
+                        ('spikes_peak_v', spikes_peak_v),
+                        ('spikes_trough_v', spikes_trough_v),
                         ('adapt_avg', adapt_avg)
 
     ])

@@ -62,9 +62,9 @@ def load_current_step_add_itrace(abf_file, ihold, istart, istep, startend=None, 
 
 def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, red_sweep=None, vlim=[-145,60], ilim=[-95,150],
-                        spikes_sweep_id = None, spikes_t = None,
-                        bias_current = 0.0, highlight = 'deepskyblue', highlight_red=sns.color_palette("muted")[2],
+                        blue_sweep=None, rheobase_sweep=None, vlim=[-145,60], ilim=[-95,150],
+                        spikes_sweep_id = None, spikes_t = None, other_features=None,
+                        bias_current = 0.0, highlight = 'deepskyblue', highlight_rheobase=sns.color_palette("muted").as_hex()[2],
                         skip_sweep=1, skip_point=10, save=False):
     '''
     Plot overlayed sweeps in current clamp protocol, with one sweep in blue color
@@ -102,24 +102,24 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
     # print(indices)
 
     if blue_sweep is not None:
-        assert(type(blue_sweep) is int)
+        assert(isinstance(blue_sweep, (int, np.integer)))
         if not blue_sweep in indices:
             indices.append(blue_sweep)
     else:
         blue_sweep = indices[-2]
 
-    if red_sweep is not None:
-        assert(type(red_sweep) is int)
-        if not red_sweep in indices:
-            indices.append(red_sweep)
+    if rheobase_sweep is not None:
+        assert(isinstance(rheobase_sweep, (int, np.integer)))
+        if not rheobase_sweep in indices:
+            indices.append(rheobase_sweep)
 
-    for i in indices:
-        if i == red_sweep:
-            color = highlight_red
+    for i in indices[::-1]:
+        if i == rheobase_sweep:
+            color = highlight_rheobase
             lw=1.25
             size=8
             alpha=1
-        if i == blue_sweep or i == data['n_sweeps'] + blue_sweep:
+        elif i == blue_sweep or i == data['n_sweeps'] + blue_sweep:
             color = highlight
             lw=1.25
             size=8
@@ -131,7 +131,13 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
             alpha=0.6
 
         axes[-2].plot(data['t'][::skip_point], data['voltage'][i][::skip_point], color=color, lw=lw, alpha=alpha)
-
+        if i == rheobase_sweep and not other_features is None:
+            threshold_t = other_features['spikes_threshold_t'][spikes_sweep_id==i]
+            threshold_v = other_features['spikes_threshold_v'][spikes_sweep_id==i]
+            trough_t = other_features['spikes_trough_t'][spikes_sweep_id==i]
+            trough_v = other_features['spikes_trough_v'][spikes_sweep_id==i]
+            axes[-2].scatter(threshold_t, threshold_v, marker='_', s=30, lw=1, c="black", alpha=alpha)
+            axes[-2].scatter(trough_t, trough_v, marker='+', s=30, lw=1, c="black", alpha=alpha)
         axes[-2].set_ylim(vlim)
         axes[-2].set_ylabel('Membrane Voltage (mV)')
         axes[-2].set_xticklabels([])
@@ -247,13 +253,13 @@ def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
 
 
 
-def plot_fi_curve(stim_amp, firing_rate, save_filepath = None):
+def plot_fi_curve(stim_amp, firing_rate, save_filepath = None, color=sns.color_palette("muted").as_hex()[0]):
     '''
     Plot F-I curve
     '''
     mpl.rcParams.update(mpl.rcParamsDefault)
     fig, ax = plt.subplots(1,1,figsize=(4,4))
-    ax.plot(stim_amp, firing_rate, marker='o', linewidth=1.5, markersize=8)
+    ax.plot(stim_amp, firing_rate, marker='o', linewidth=1.5, markersize=8, color=color)
     fig.gca().spines['right'].set_visible(False)
     fig.gca().spines['top'].set_visible(False)
     ax.set_ylabel('Spikes per second', fontsize=14)
@@ -265,7 +271,7 @@ def plot_fi_curve(stim_amp, firing_rate, save_filepath = None):
 
 
 def plot_first_spike(data, features, time_zero='threshold',
-                    window=None, vlim=[-80, 60], color=sns.color_palette("muted")[2],
+                    window=None, vlim=[-80, 60], color=sns.color_palette("muted").as_hex()[2],
                     save_filepath = None):
     '''
     Plot the first action potential. Time window is something like:
@@ -297,7 +303,7 @@ def plot_first_spike(data, features, time_zero='threshold',
 
     mpl.rcParams.update(mpl.rcParamsDefault)
     fig, ax = plt.subplots(1,1,figsize=(4,4))
-    ax.plot(t, v, color=color)
+    ax.plot(t, v, color=color, lw=2)
 
     threshold_time = (features['spikes_threshold_t'][0] - t0) * 1000
     ax.hlines(features['ap_threshold'], window[0], threshold_time,
@@ -317,7 +323,7 @@ def plot_first_spike(data, features, time_zero='threshold',
 
 def plot_phase_plane(data, features, filter=None, window=[-50, 200],
                         vlim=[-80, 60], dvdtlim=[-80, 320],
-                        color=sns.color_palette("muted")[1],
+                        color=sns.color_palette("muted").as_hex()[1],
                         save_filepath=None):
     t0 = features['spikes_threshold_t'][0]
     ap_window = [t0 + x * 0.001 for x in window]
@@ -333,7 +339,7 @@ def plot_phase_plane(data, features, filter=None, window=[-50, 200],
 
     mpl.rcParams.update(mpl.rcParamsDefault)
     fig, ax = plt.subplots(1,1,figsize=(4, 4))
-    ax.plot(v[0:-1], dvdt, color=color)
+    ax.plot(v[0:-1], dvdt, color=color, lw=2)
 
     ax.set_xlim(vlim)
     ax.set_ylim(dvdtlim)

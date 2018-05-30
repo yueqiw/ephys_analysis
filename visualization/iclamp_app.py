@@ -71,12 +71,8 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
 
     # labels and color maps
     text_labels = ['-'.join([x, y]) for x, y in zip(cells_ap['experiment'], cells_ap['recording'])]
-    experiments = cells_ap['experiment'].unique()
-    cluster_colors = sns.hls_palette(len(experiments), l=0.7)
-    random.seed(0)
-    colors = random.sample(cluster_colors, len(cluster_colors), )
-    exp_lut = dict(zip(experiments, colors))
-    idx_color_mapping = cells_ap['experiment'].map(exp_lut)
+
+    idx_color_mapping, exp_lut = categorical_color_mapping(cells_ap['experiment'])
 
     # generate cluster heatmap using Seaborn
     features = [feature_names[x] for x in cells_adapt_features.columns]
@@ -105,8 +101,8 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                 html.Div([
                     dcc.Dropdown(
                         id='feature_pc',
-                        options=[{'label': 'None ', 'value': None},
-                                 {'label': 'Experiment ', 'value': 'experiment'}] + \
+                        options=[{'label': 'None ', 'value': None}] + \
+                                [{'label': k.capitalize() + ' ', 'value': k} for k in metadata_in_dropdown] + \
                                 [{'label': v + ' ', 'value': k} for k, v in feature_names.items()],
                         value=None
                     )
@@ -187,9 +183,9 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         if feature is None:
             color = ['rgba(' + str(1-a) + ', ' + str(b) + ', ' + str(c) + ')' \
                    for a,b,c in cells_adapt_pca_minmax[:,:3]]
-        elif feature == 'experiment':
+        elif feature in metadata_in_dropdown:
             color = ['rgba(' + str(a-0.001) + ', ' + str(b-0.001) + ', ' + str(c-0.001) + ')' \
-                   for a,b,c in idx_color_mapping]
+                   for a,b,c in categorical_color_mapping(cells_ap[feature])[0]]
             print(color)
         else:
             i = list(feature_names.keys()).index(feature)
@@ -251,7 +247,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         plot_paths_row = plot_paths[plot_paths.recording == recording]
         gif_path, png_path = \
             [os.path.join(args.data, plot_paths_row[x].item()) \
-                for x in ['gif_path', 'png_path']]
+                for x in ['istep_gif_path', 'istep_png_mid_path']]
         if png_gif == 'gif':
             encoded_img = base64.b64encode(open(gif_path, 'rb').read())
             decoded_img = 'data:image/gif;base64,{}'.format(encoded_img.decode())
@@ -268,7 +264,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         '''show F-I curve, first action potential and phase plane plot.'''
         recording = hoverData['points'][0]['hoverinfo']
         plot_paths_row = plot_paths[plot_paths.recording == recording]
-        fi_spike_phase_path = os.path.join(args.data, plot_paths_row['fi_spike_phase_mid'].item())
+        fi_spike_phase_path = os.path.join(args.data, plot_paths_row['mid_fi_spike_phase'].item())
         encoded_img = base64.b64encode(open(fi_spike_phase_path, 'rb').read())
         decoded_img = 'data:image/png;base64,{}'.format(encoded_img.decode())
         return decoded_img

@@ -8,6 +8,7 @@ from scipy.cluster import hierarchy
 import matplotlib.patches as mpatches
 import io
 import base64
+import random
 
 sns.set()
 
@@ -36,6 +37,8 @@ qc_cols = ['v_baseline',
 id_cols = ['experiment', 'cell', 'recording', 'id', 'date']
 meta_cols = ['has_ap', 'strain', 'dob', 'age', 'slicetype']
 
+metadata_in_dropdown = ['experiment', 'strain']
+
 muted = {name: 'rgba(' + str(a) + ', ' + str(b) + ', ' + str(c) + ')' for name, (a, b, c) \
     in zip(['blue', 'green', 'red', 'purple', 'yellow', 'cyan'], sns.color_palette("muted"))}
 
@@ -59,6 +62,16 @@ def cluster_heatmap(data, features, idx_color_mapping, exp_lut, legend=True):
 
         plt.legend(handles=legend_patches, fontsize=18)
     return g
+
+
+def categorical_color_mapping(data, seed=0):
+    categories = data.unique()
+    cluster_colors = sns.hls_palette(len(categories), l=0.7)
+    random.seed(seed)
+    colors = random.sample(cluster_colors, len(cluster_colors), )
+    lut = dict(zip(categories, colors))
+    cat_color_mapping = data.map(lut)
+    return cat_color_mapping, lut
 
 def byte_encode_img(fig):
     '''save the figure into memory buffer and byte encode it for html.'''

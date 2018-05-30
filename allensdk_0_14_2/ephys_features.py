@@ -146,7 +146,7 @@ def filter_putative_spikes(v, t, spike_indexes, peak_indexes, min_height=2.,
 
     if dvdt is None:
         dvdt = calculate_dvdt(v, t, filter)
-        
+
     diff_mask = [np.any(dvdt[peak_ind:spike_ind] < 0)
                  for peak_ind, spike_ind
                  in zip(peak_indexes[:-1], spike_indexes[1:])]
@@ -214,13 +214,18 @@ def refine_threshold_indexes(v, t, upstroke_indexes, thresh_frac=0.05, filter=10
     if dvdt is None:
         dvdt = calculate_dvdt(v, t, filter)
 
-    avg_upstroke = dvdt[upstroke_indexes].mean()
-    target = avg_upstroke * thresh_frac
+    #avg_upstroke = dvdt[upstroke_indexes].mean()
+    #target = avg_upstroke * thresh_frac
+
+    # CHANGE
+    # use different dvdt thresh for each spike (sometimes later spikes have slower kinetics overall)
+    target_all = dvdt[upstroke_indexes] * thresh_frac
 
     upstrokes_and_start = np.append(np.array([0]), upstroke_indexes)
     threshold_indexes = []
-    for upstk, upstk_prev in zip(upstrokes_and_start[1:], upstrokes_and_start[:-1]):
-        potential_indexes = np.flatnonzero(dvdt[upstk:upstk_prev:-1] <= target)
+    for upstk, upstk_prev, target_individual in zip(upstrokes_and_start[1:], upstrokes_and_start[:-1], target_all):
+        #potential_indexes = np.flatnonzero(dvdt[upstk:upstk_prev:-1] <= target)
+        potential_indexes = np.flatnonzero(dvdt[upstk:upstk_prev:-1] <= target_individual)
         if not potential_indexes.size:
             # couldn't find a matching value for threshold,
             # so just going to the start of the search interval
@@ -235,7 +240,7 @@ def check_thresholds_and_peaks(v, t, spike_indexes, peak_indexes, upstroke_index
                                max_interval=0.005, thresh_frac=0.05, filter=10., dvdt=None):
     """Validate thresholds and peaks for set of spikes
 
-    Check that peaks and thresholds for consecutive spikes do not overlap
+    Check that peaks and thresholds for consecutive spikes do not overlap (or very close)
     Spikes with overlapping thresholds and peaks will be merged.
 
     Check that peaks and thresholds for a given spike are not too far apart.
@@ -263,7 +268,7 @@ def check_thresholds_and_peaks(v, t, spike_indexes, peak_indexes, upstroke_index
     if not end:
         end = t[-1]
 
-    overlaps = np.flatnonzero(spike_indexes[1:] <= peak_indexes[:-1] + 1)
+    overlaps = np.flatnonzero(spike_indexes[1:] <= peak_indexes[:-1] + 10)
     if overlaps.size:
         spike_mask = np.ones_like(spike_indexes, dtype=bool)
         spike_mask[overlaps + 1] = False
@@ -328,7 +333,7 @@ def check_thresholds_and_peaks(v, t, spike_indexes, peak_indexes, upstroke_index
     # voltage - otherwise, drop it
     clipped = np.zeros_like(spike_indexes, dtype=bool)
     end_index = find_time_index(t, end)
-    if len(spike_indexes) > 0 and not np.any(v[peak_indexes[-1]:end_index + 1] <= v[spike_indexes[-1]]):
+    if len(spike_indexes) > 0 and t[end_index] - t[peak_indexes[-1]] < 0.1 and not np.any(v[peak_indexes[-1]:end_index + 1] <= v[spike_indexes[-1]]):
         logging.debug("Failed to return to threshold voltage (%f) after last spike (min %f) - marking last spike as clipped", v[spike_indexes[-1]], v[peak_indexes[-1]:end_index + 1].min())
         clipped[-1] = True
 
@@ -338,6 +343,8 @@ def check_thresholds_and_peaks(v, t, spike_indexes, peak_indexes, upstroke_index
 def find_trough_indexes(v, t, spike_indexes, peak_indexes, clipped=None, end=None):
     """
     Find indexes of minimum voltage (trough) between spikes.
+    if the interval between spike1 and [spike2 or end] < 100ms, use the min voltage
+    between spike1 and (spike1 + 100ms)
 
     Parameters
     ----------
@@ -362,15 +369,25 @@ def find_trough_indexes(v, t, spike_indexes, peak_indexes, clipped=None, end=Non
         end = t[-1]
     end_index = find_time_index(t, end)
 
+
     trough_indexes = np.zeros_like(spike_indexes, dtype=float)
-    trough_indexes[:-1] = [v[peak:spk].argmin() + peak for peak, spk
-                           in zip(peak_indexes[:-1], spike_indexes[1:])]
+    trough_indexes[:-1] = [v[peak:spk].argmin() + peak
+                           if t[spk] - t[peak] < 0.1
+                           else v[peak:(peak + find_time_index(t[peak:spk], t[peak]+0.1))].argmin() + peak
+                           for peak, spk in zip(peak_indexes[:-1], spike_indexes[1:])]
 
     if clipped[-1]:
         # If last spike is cut off by the end of the window, trough is undefined
         trough_indexes[-1] = np.nan
     else:
-        trough_indexes[-1] = v[peak_indexes[-1]:end_index].argmin() + peak_indexes[-1]
+        peak = peak_indexes[-1]
+        #print(t[peak], t[end_index])
+        #if t[end_index] - t[peak] > 0.1:
+        #    print(peak, (peak + find_time_index(t[peak:end_index], t[peak]+0.1)))
+        trough_indexes[-1] = v[peak:end_index].argmin() + peak \
+                             if t[end_index] - t[peak] < 0.1 \
+                             else v[peak:(peak + find_time_index(t[peak:end_index], t[peak]+0.1))].argmin() + peak
+    #print(t[trough_indexes[~np.isnan(trough_indexes)].astype('int')])
 
     # nwg - trying to remove this next part for now - can't figure out if this will be needed with new "clipped" method
 

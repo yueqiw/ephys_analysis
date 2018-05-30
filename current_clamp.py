@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 from matplotlib import gridspec, animation
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 import allensdk_0_14_2.ephys_features as ft
 
@@ -62,9 +62,12 @@ def load_current_step_add_itrace(abf_file, ihold, istart, istep, startend=None, 
 
 def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, rheobase_sweep=None, vlim=[-145,60], ilim=[-95,150],
+                        blue_sweep=None, rheobase_sweep=None, sag_sweeps=[], vlim=[-145,60], ilim=[-95,150],
                         spikes_sweep_id = None, spikes_t = None, other_features=None,
-                        bias_current = 0.0, highlight = 'deepskyblue', highlight_rheobase=sns.color_palette("muted").as_hex()[2],
+                        bias_current = 0.0,
+                        highlight = 'deepskyblue',
+                        highlight_rheobase=sns.color_palette("muted").as_hex()[2],
+                        highlight_sag=sns.color_palette("muted").as_hex()[4],
                         skip_sweep=1, skip_point=10, save=False):
     '''
     Plot overlayed sweeps in current clamp protocol, with one sweep in blue color
@@ -124,6 +127,11 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
             lw=1.25
             size=8
             alpha=1
+        elif i in sag_sweeps:
+            color = highlight_sag
+            lw=0.5
+            size=3
+            alpha=1
         else:
             color = 'gray'
             lw=0.2
@@ -139,30 +147,30 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
             axes[-2].scatter(threshold_t, threshold_v, marker='_', s=30, lw=1, c="black", alpha=alpha)
             axes[-2].scatter(trough_t, trough_v, marker='+', s=30, lw=1, c="black", alpha=alpha)
         axes[-2].set_ylim(vlim)
-        axes[-2].set_ylabel('Membrane Voltage (mV)')
+        axes[-2].set_ylabel('Membrane Voltage (mV)', fontsize=16)
         axes[-2].set_xticklabels([])
 
         axes[-1].plot(data['t'][::skip_point], data['current'][i][::skip_point] - bias_current, color=color, lw=lw, alpha=alpha)
         axes[-1].set_ylim(ilim)
-        axes[-1].set_ylabel('Current (pA)')
-        axes[-1].set_xlabel('Time (s)')
+        axes[-1].set_ylabel('Current (pA)', fontsize=16)
+        axes[-1].set_xlabel('Time (s)', fontsize=16)
 
         if n_plots == 3:
             spikes = spikes_t[spikes_sweep_id==i]
             axes[0].scatter(spikes, np.ones_like(spikes) * i, marker='o', s=size, c=color, alpha=alpha)
             axes[0].set_ylim([1, data['n_sweeps']])
             axes[0].set_xticklabels([])
-            # axes[0].set_ylabel('Sweeps')
-
+            axes[0].set_ylabel('Sweeps', fontsize=16)
 
     for ax in axes:
         ax.set_xlim(xlim)
+        ax.yaxis.set_label_coords(-0.64/figsize[0],0.5)
         ax.patch.set_alpha(0.2)
 
     plt.tight_layout()
     if save is True:
         plt.savefig(os.path.join(data['file_directory'], data['file_id']) + '.png', dpi=300)
-        plt.savefig(os.path.join(data['file_directory'], data['file_id']) + '.svg')
+        #plt.savefig(os.path.join(data['file_directory'], data['file_id']) + '.svg')
         plt.savefig(os.path.join(data['file_directory'], data['file_id']) + '.pdf')
 
     return fig
@@ -170,13 +178,16 @@ def plot_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
 
 def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
                         startend=None, offset=[0.2, 0.4],
-                        blue_sweep=None, vlim=[-155,60], ilim=[-95,150],
+                        vlim=[-145,60], ilim=[-95,150],
                         spikes_sweep_id = None, spikes_t = None,
                         bias_current = 0.0, highlight = 'deepskyblue',
-                        skip_point=10, save=False, save_filepath=None):
+                        skip_point=10, save=False, save_filepath=None, fps=2.5, dpi=100, blit=True):
     '''
     Make animated GIF containing all the sweeps in current clamp protocol.
     If detected spikes are provided, also plot detected spikes.
+
+    Note the slow speed of this function is due to image -> gif/mp4 conversion, not creating animation.
+    Creating animation takes < 1s. Saving it takes 5 - 10s.
     '''
     fig_width = fig_height
     if (spikes_sweep_id is not None) and (spikes_t is not None):
@@ -187,50 +198,7 @@ def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
         n_plots = 2
         height_ratios = [3,1]
 
-
-    def init_animation():
-        animate(-1)
-
-    def animate(j):
-        plt.style.use('ggplot')
-
-        gs = gridspec.GridSpec(n_plots, 1, height_ratios=height_ratios)
-        axes = [plt.subplot(gs[x]) for x in range(n_plots)]
-
-        for i in range(data['n_sweeps']):
-            if i == j:
-                color = highlight
-                lw=1.5
-                size=12
-                alpha=1
-            else:
-                color = 'gray'
-                lw=0.2
-                size=4
-                alpha=0.6
-
-            axes[-2].plot(data['t'][::skip_point], data['voltage'][i][::skip_point], color=color, lw=lw, alpha=alpha)
-
-            axes[-2].set_ylim(vlim)
-            axes[-2].set_ylabel('Membrane Voltage (mV)')
-            axes[-2].set_xticklabels([])
-            axes[-1].plot(data['t'][::skip_point], data['current'][i][::skip_point] - bias_current, color=color, lw=lw, alpha=alpha)
-            axes[-1].set_ylim(ilim)
-            axes[-1].set_ylabel('Current (pA)')
-            axes[-1].set_xlabel('Time (s)')
-            if n_plots == 3:
-                spikes = spikes_t[spikes_sweep_id==i]
-                axes[0].scatter(spikes, np.ones_like(spikes) * i, marker='o', s=size, c=color, alpha=alpha)
-                axes[0].set_ylim([1, data['n_sweeps']])
-                axes[0].set_xticklabels([])
-                # axes[0].set_ylabel('Sweeps')
-
-        for ax in axes:
-            ax.set_xlim(xlim)
-            ax.patch.set_alpha(0.2)
-
-        plt.tight_layout()
-
+    plt.style.use('ggplot')
     if startend is not None:
         assert(type(startend) is list and len(startend) == 2)
         start = startend[0] - offset[0]
@@ -240,17 +208,73 @@ def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
         figsize = (length * x_scale * fig_width / 6., fig_height)
     else:
         figsize = (fig_width, fig_height)
+
     fig = plt.figure(figsize=figsize)
 
-    anim = animation.FuncAnimation(fig, animate, init_func=init_animation, frames=data['n_sweeps'])
-    if save:
-        if save_filepath is not None:
-            # use default dpi=100. Setting other dpi values will produce wierd-looking plots.
-            anim.save(save_filepath, writer='imagemagick', fps=2.5)
-        else:
-            anim.save(os.path.join(data['file_directory'], data['file_id']) + '.gif', writer='imagemagick', fps=2.5)
-    return fig
+    gs = gridspec.GridSpec(n_plots, 1, height_ratios=height_ratios)
+    axes = [plt.subplot(gs[x]) for x in range(n_plots)]
 
+    # plot background traces in light gray
+    color = 'gray'
+    lw=0.2
+    size=2
+    alpha=0.6
+    for i in range(data['n_sweeps']):
+        axes[-2].plot(data['t'][::skip_point], data['voltage'][i][::skip_point], color=color, lw=lw, alpha=alpha)
+        axes[-1].plot(data['t'][::skip_point], data['current'][i][::skip_point] - bias_current, color=color, lw=lw, alpha=alpha)
+        if n_plots == 3:
+             spikes = spikes_t[spikes_sweep_id==i]
+             axes[0].plot(spikes, np.ones_like(spikes) * i, marker='o', markersize=size, ls='', color=color, alpha=alpha)
+
+    axes[-2].set_ylim(vlim)
+    axes[-2].set_ylabel('Membrane Voltage (mV)')
+    axes[-2].set_xticklabels([])
+    axes[-1].set_ylim(ilim)
+    axes[-1].set_ylabel('Current (pA)')
+    axes[-1].set_xlabel('Time (s)')
+    if n_plots == 3:
+        axes[0].set_ylim([1, data['n_sweeps']])
+        axes[0].set_xticklabels([])
+    for ax in axes:
+        ax.set_xlim(xlim)
+        ax.yaxis.set_label_coords(-0.64/figsize[0],0.5)
+        ax.patch.set_alpha(0.2)
+
+    plt.tight_layout()
+
+    # initialize plots of highlighted traces
+    color = highlight
+    lw=1.5
+    size=3
+    alpha=1
+    plot_2, = axes[-2].plot([], [], color=color, lw=lw, alpha=alpha)
+    plot_1, = axes[-1].plot([], [], color=color, lw=lw, alpha=alpha)
+    if n_plots == 3:
+        plot_0, = axes[0].plot([], [], marker='o', markersize=size, ls='', color=color, alpha=alpha)
+
+    def init_animation():
+        return plot_0, plot_1, plot_2
+
+    # animate the highlighted traces
+    def animate(j):
+        plot_2.set_data(data['t'][::skip_point], data['voltage'][j][::skip_point])
+        plot_1.set_data(data['t'][::skip_point], data['current'][j][::skip_point] - bias_current)
+        if n_plots == 3:
+            spikes = spikes_t[spikes_sweep_id==j]
+            plot_0.set_data(spikes, np.ones_like(spikes) * j)
+        return plot_0, plot_1, plot_2
+
+    anim = animation.FuncAnimation(fig, animate, init_func=init_animation, frames=data['n_sweeps'], blit=blit)
+    if save:
+        if save_filepath is None:
+            raise ValueError("Please provide save path (gif or mp4).")
+        elif save_filepath.endswith('.gif'):
+            # use default dpi=100. Setting other dpi values will produce wierd-looking plots.
+            anim.save(save_filepath, writer='imagemagick', fps=fps, dpi=dpi)
+        elif save_filepath.endswith('.mp4'):
+            anim.save(save_filepath, writer='ffmpeg', fps=fps, dpi=dpi)
+
+    return fig, anim
 
 
 def plot_fi_curve(stim_amp, firing_rate, save_filepath = None, color=sns.color_palette("muted").as_hex()[0]):
@@ -262,13 +286,32 @@ def plot_fi_curve(stim_amp, firing_rate, save_filepath = None, color=sns.color_p
     ax.plot(stim_amp, firing_rate, marker='o', linewidth=1.5, markersize=8, color=color)
     fig.gca().spines['right'].set_visible(False)
     fig.gca().spines['top'].set_visible(False)
-    ax.set_ylabel('Spikes per second', fontsize=14)
-    ax.set_xlabel('Current (pA)', fontsize=14)
+    ax.set_ylabel('Spikes per second', fontsize=18)
+    ax.set_xlabel('Current (pA)', fontsize=18)
+    ax.yaxis.set_label_coords(-0.22,0.5)
+    ax.tick_params(axis = 'both', which = 'major', labelsize = 14)
     fig.tight_layout()
     if save_filepath is not None:
-        fig.savefig(save_filepath, dpi=300)
+        fig.savefig(save_filepath, dpi=200)
     return fig
 
+def plot_vi_curve(stim_amp, voltage, save_filepath = None, color="gray"):
+    '''
+    Plot V-I curve
+    '''
+    mpl.rcParams.update(mpl.rcParamsDefault)
+    fig, ax = plt.subplots(1,1,figsize=(4,4))
+    ax.plot(stim_amp, voltage, marker='o', linewidth=1.5, markersize=8, color=color)
+    fig.gca().spines['right'].set_visible(False)
+    fig.gca().spines['top'].set_visible(False)
+    ax.set_ylabel('Voltage (mV)', fontsize=18)
+    ax.set_xlabel('Current (pA)', fontsize=18)
+    ax.yaxis.set_label_coords(-0.22,0.5)
+    ax.tick_params(axis = 'both', which = 'major', labelsize = 14)
+    fig.tight_layout()
+    if save_filepath is not None:
+        fig.savefig(save_filepath, dpi=200)
+    return fig
 
 def plot_first_spike(data, features, time_zero='threshold',
                     window=None, vlim=[-80, 60], color=sns.color_palette("muted").as_hex()[2],
@@ -312,12 +355,14 @@ def plot_first_spike(data, features, time_zero='threshold',
     ax.set_ylim(vlim)
     fig.gca().spines['right'].set_visible(False)
     fig.gca().spines['top'].set_visible(False)
-    ax.set_ylabel('Voltage (mV)', fontsize=14)
-    ax.set_xlabel('Time (ms)', fontsize=14)
+    ax.set_ylabel('Voltage (mV)', fontsize=18)
+    ax.set_xlabel('Time (ms)', fontsize=18)
+    ax.yaxis.set_label_coords(-0.22,0.5)
+    ax.tick_params(axis = 'both', which = 'major', labelsize = 14)
     fig.tight_layout()
 
     if save_filepath is not None:
-        fig.savefig(save_filepath, dpi=300)
+        fig.savefig(save_filepath, dpi=200)
     return fig
 
 
@@ -345,12 +390,14 @@ def plot_phase_plane(data, features, filter=None, window=[-50, 200],
     ax.set_ylim(dvdtlim)
     fig.gca().spines['right'].set_visible(False)
     fig.gca().spines['top'].set_visible(False)
-    ax.set_xlabel('Voltage (mV)', fontsize=14)
-    ax.set_ylabel('dV/dt (V/s)', fontsize=14)
+    ax.set_xlabel('Voltage (mV)', fontsize=18)
+    ax.set_ylabel('dV/dt (V/s)', fontsize=18)
+    ax.yaxis.set_label_coords(-0.22,0.5)
+    ax.tick_params(axis = 'both', which = 'major', labelsize = 14)
     fig.tight_layout()
 
     if save_filepath is not None:
-        fig.savefig(save_filepath, dpi=300)
+        fig.savefig(save_filepath, dpi=200)
     return fig
 
 
@@ -402,3 +449,12 @@ def combine_horizontal(images, scale = 1, same_size = False):
         combined = combined.resize([int(x * scale) for x in combined.size], resample=Image.BICUBIC)
 
     return combined
+
+
+def draw_text_on_image(image, text_list, location_list=[(0,0)], font_path='Arial.ttf', font_size=20):
+    image = image.copy()
+    font = ImageFont.truetype(font_path, size=font_size)
+    d = ImageDraw.Draw(image)
+    for text, location in zip(text_list, location_list):
+        d.text(location, text, font=font, fill=(0,0,0))
+    return image

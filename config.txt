@@ -1,0 +1,3 @@
+{ "data": "visualization/data/",
+  "analysis": "visualization/data/analysis_current_clamp/data/"
+}

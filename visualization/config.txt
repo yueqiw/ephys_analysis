@@ -1,3 +1,0 @@
-{ "data": "data/",
-  "analysis": "data/analysis_current_clamp/data/"
-}

@@ -13,70 +13,44 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import os
-import argparse
-#import path
-import json
+
 import random
 
-from sklearn import preprocessing
-from sklearn.decomposition import PCA
+from .viz_utils import *
+from .feature_annotations import *
 
-from app_utils import *
-
-with open("config.txt", 'r') as f:
-    file_paths = json.load(f)
-
-parser = argparse.ArgumentParser(description='Viz for Patch Clamp Electrophysiology')
-parser.add_argument('--data',
-                default=os.path.expanduser(file_paths['data']),
-                type=str, help='Directory for raw data')
-parser.add_argument('--analysis',
-                default=os.path.expanduser(file_paths['analysis']),
-                type=str, help='Directory for analysis files')
-args = parser.parse_args()
-
-# load data
-# use pre-computed features stored on local drive (fetched from Datajoint.)
-unique_isteps = pd.read_excel(os.path.join(args.analysis, 'unique_isteps_narrow.xlsx'))
-plot_paths = pd.read_csv(os.path.join(args.analysis, 'plot_path.csv'))
-#TODO: integrate with datajoint, and fetch data directly from database
-
-def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
+def iclamp_viz(input_data, plot_paths, data_root_dir):
     app = dash.Dash()
 
     # subset cells with and without action potentials
-    cells_all = unique_isteps[[x for x in unique_isteps.columns if x != 'duplicates']]
-    cells_ap = cells_all[(cells_all['has_ap'] == 'Yes') & (cells_all['hs_firing_rate'] >0)].reset_index(drop=True)
-    # cells_ap = cells_ap[cells_ap['cm_est'] < 75].reset_index(drop=True)  # no need to remove outlier
-    # cells_noap = cells_all[cells_all['has_ap'] == 'No'].reset_index(drop=True)
+    cells_ap = input_data.loc[(input_data['has_ap'] == 'Yes'),:].copy()
 
     # select useful features
-    # cells_ap_features = cells_ap[features_noAP + features_ap]
-    cells_adapt_features = cells_ap[features_noAP + features_ap + ['adapt_avg']].fillna(value={'adapt_avg':0})
-    cells_adapt_arr_raw = np.array(cells_adapt_features)
 
-    # log transform
-    cells_adapt_features['ap_width'] = np.log10(cells_adapt_features['ap_width'])
-    cells_adapt_features['ap_upstroke'] = np.log10(cells_adapt_features['ap_upstroke'])
-
-    cells_adapt_arr = np.array(cells_adapt_features)
+    features_pca = features_noAP + features_ap # adapt_avg has missing data, cannot use for pca
+    features_raw = features_noAP + features_ap + ['adapt_avg'] # NOTE: this has to be the same order features_cluster
+    features_cluster = log_features_noAP + log_features_ap + ['adapt_avg']
+    cells_features_raw = cells_ap[features_raw]
+    cells_features_raw_scaled = (cells_features_raw - cells_features_raw.mean()) / cells_features_raw.std(ddof=0)
 
     # run PCA
-    scaler = preprocessing.StandardScaler().fit(cells_adapt_arr)
-    cells_adapt_scaled = scaler.transform(cells_adapt_arr)
-    pca = PCA(n_components = None)
-    pca.fit(cells_adapt_scaled)
-    cells_adapt_pca = pca.transform(cells_adapt_scaled)
-    cells_adapt_pca_minmax = preprocessing.MinMaxScaler().fit_transform(cells_adapt_pca) * 0.95 + 0.025
+    pca, cells_pca, cells_scaled = run_pca(cells_ap[features_pca])
+    cells_pca_minmax = preprocessing.MinMaxScaler().fit_transform(cells_pca) * 0.95 + 0.025
+
+    # TODO: add UMAP
 
     # labels and color maps
     text_labels = ['-'.join([x, y]) for x, y in zip(cells_ap['experiment'], cells_ap['recording'])]
 
-    idx_color_mapping, exp_lut = categorical_color_mapping(cells_ap['experiment'])
-
     # generate cluster heatmap using Seaborn
-    features = [feature_names[x] for x in cells_adapt_features.columns]
-    g = cluster_heatmap(cells_adapt_scaled, features, idx_color_mapping, exp_lut, legend=False)
+    k_cluster = 5
+    with sns.axes_style(None, {'axes.facecolor':'#e5e5e5'}):
+        g, hclust_labels = cluster_heatmap(data_df=cells_ap[features_cluster], feature_name_dict=feature_name_dict,
+                        categorical_df=cells_ap, categories=['cluster', 'strain'], k_cluster=k_cluster,
+                        method='average', metric='correlation', row_cluster=True, mask=None,
+                        caterogy_color_l=0.65, caterogy_color_s=[0.65, 0.4, 0.5], color_seed=1)
+
+    cells_ap['cluster'] = hclust_labels
     feature_order_hclust = g.dendrogram_row.reordered_ind[::-1]
     # encode the heatmap png image into memory buffer
     decoded_heatmap = byte_encode_img(g)
@@ -103,7 +77,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                         id='feature_pc',
                         options=[{'label': 'None ', 'value': None}] + \
                                 [{'label': k.capitalize() + ' ', 'value': k} for k in metadata_in_dropdown] + \
-                                [{'label': v + ' ', 'value': k} for k, v in feature_names.items()],
+                                [{'label': v + ' ', 'value': k} for k, v in feature_name_dict.items()],
                         value=None
                     )
                 ], style={'width': '30%'}),
@@ -151,12 +125,12 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
                         style={'height': '100%'})
                 ], style={'width': '60%', 'height': '100%', 'display': 'inline-block'}),
             html.Div([
-                dcc.Graph(id='cell_bar',
-                        style={'height': '100%'})
+                # dcc.Graph(id='cell_bar',
+                #         style={'height': '100%'})
                 ], style={'width': '30%', 'height': '130%', 'display': 'inline-block'}),
             html.Div([], style={'width': '20%', 'height': '100%', 'display': 'inline-block'})
 
-        ], style={'height': '400px', 'width': '100%',
+        ], style={'height': '600px', 'width': '100%',
                     'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'})
     ], style={'width': '1600px', 'margin':'auto'})
 
@@ -168,8 +142,8 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         [dash.dependencies.Input('feature_pc', 'value')])
     def return_feature(feature):
         '''update the feature name used for PCA'''
-        if feature in feature_names:
-            return feature_names[feature]
+        if feature in feature_name_dict:
+            return feature_name_dict[feature]
         elif feature is None:
             return 'Select features to plot on PCA'
         else:
@@ -180,22 +154,29 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         [dash.dependencies.Input('feature_pc', 'value')])
     def update_cell_pca_3d(feature):
         '''draw 3D PCA plot with selected feature'''
+        # cells_pca_minmax
+        # metadata_in_dropdown
+        # cells_ap
+        # cells_scaled
+        # cells_pca
+        # text_labels
+        # pca
         if feature is None:
             color = ['rgba(' + str(1-a) + ', ' + str(b) + ', ' + str(c) + ')' \
-                   for a,b,c in cells_adapt_pca_minmax[:,:3]]
+                   for a,b,c in cells_pca_minmax[:,:3]]
         elif feature in metadata_in_dropdown:
             color = ['rgba(' + str(a-0.001) + ', ' + str(b-0.001) + ', ' + str(c-0.001) + ')' \
                    for a,b,c in categorical_color_mapping(cells_ap[feature])[0]]
             print(color)
-        else:
-            i = list(feature_names.keys()).index(feature)
-            color = cells_adapt_scaled[:,i]
+        elif feature in features_pca:
+            i = list(features_pca).index(feature)
+            color = cells_scaled[:,i]
 
         return {
             'data': [go.Scatter3d(
-                x=cells_adapt_pca[:,0],
-                y=cells_adapt_pca[:,2],
-                z=cells_adapt_pca[:,1],
+                x=cells_pca[:,0],
+                y=cells_pca[:,2],
+                z=cells_pca[:,1],
                 mode='markers',
                 text=text_labels,
                 hoverinfo=[x for x in cells_ap['recording']],
@@ -245,15 +226,15 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         '''
         recording = hoverData['points'][0]['hoverinfo']
         plot_paths_row = plot_paths[plot_paths.recording == recording]
-        gif_path, png_path = \
-            [os.path.join(args.data, plot_paths_row[x].item()) \
-                for x in ['istep_gif_path', 'istep_png_mid_path']]
-        if png_gif == 'gif':
+
+        if png_gif == 'gif' and type(plot_paths_row['istep_gif_path'].item()) is str:
+            gif_path = os.path.join(data_root_dir, plot_paths_row['istep_gif_path'].item())
             encoded_img = base64.b64encode(open(gif_path, 'rb').read())
             decoded_img = 'data:image/gif;base64,{}'.format(encoded_img.decode())
         else:
+            png_path = os.path.join(data_root_dir, plot_paths_row['istep_png_mid_path'].item())
             encoded_img = base64.b64encode(open(png_path, 'rb').read())
-            decoded_img = 'data:image/o=png;base64,{}'.format(encoded_img.decode())
+            decoded_img = 'data:image/png;base64,{}'.format(encoded_img.decode())
 
         return decoded_img
 
@@ -264,7 +245,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         '''show F-I curve, first action potential and phase plane plot.'''
         recording = hoverData['points'][0]['hoverinfo']
         plot_paths_row = plot_paths[plot_paths.recording == recording]
-        fi_spike_phase_path = os.path.join(args.data, plot_paths_row['mid_fi_spike_phase'].item())
+        fi_spike_phase_path = os.path.join(data_root_dir, plot_paths_row['mid_fi_spike_phase'].item())
         encoded_img = base64.b64encode(open(fi_spike_phase_path, 'rb').read())
         decoded_img = 'data:image/png;base64,{}'.format(encoded_img.decode())
         return decoded_img
@@ -283,77 +264,7 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         return 'Date: {} -- Strain: {}  --  Recording: {} -- Index: {}  ' \
             .format(list(cell_info['date'])[0].strftime("%Y-%m-%d"), *[list(cell_info[x])[0] for x in ['strain', 'recording']], idx)
 
-    @app.callback(
-        dash.dependencies.Output('cell_bar', 'figure'),
-        [dash.dependencies.Input('cell_pca_3d', 'hoverData')])
-    def update_cell_bar(hoverData):
-        '''Scatter plot highlighting all features of a selected cell.'''
-        recording = hoverData['points'][0]['hoverinfo']
-        features_scaled = cells_adapt_scaled[cells_ap.recording == recording][0][feature_order_hclust]
-        features_raw = cells_adapt_arr_raw[cells_ap.recording == recording][0][feature_order_hclust]
-        features_name = cells_adapt_features.columns[feature_order_hclust]
 
-        background = [go.Scatter(
-            x=cells_adapt_scaled[i][feature_order_hclust],
-            y=features_name,
-            #orientation = 'h',
-            mode='markers+lines',
-            line=dict(
-                color='lightgrey',
-                width=2),
-            marker=dict(
-                size=5,
-                color='lightblue',
-                line=dict(
-                    color='grey',
-                    width=1.5,
-                )
-            ),
-            opacity=0.2,
-            hoverinfo='none'
-        ) for i in range(len(cells_adapt_features))]
-
-        hightlight = go.Scatter(
-            x=features_scaled,
-            y=features_name,
-            #orientation = 'h',
-            mode='markers+lines+text',
-            text=[format(x, '.3g') for x in features_raw],
-            textposition='right',
-            line=dict(
-                color=muted['green'],
-                width=2),
-            marker=dict(
-                size=15,
-                color=muted['blue'],
-                line=dict(
-                    color='grey',
-                    width=1.5,
-                )
-            ),
-            opacity=0.8,
-            hoverinfo='none'
-        )
-
-        data = [*background, hightlight]
-        layout = go.Layout(
-            title=None,
-            showlegend=False,
-            xaxis=dict(
-                showticklabels=False,
-            ),
-            yaxis=dict(
-                showticklabels=False,
-            ),
-            margin=dict(
-                l=00,
-                r=150,
-                b=55,
-                t=105
-            ),
-
-        )
-        return {'data': data, 'layout': layout}
 
     @app.callback(
         dash.dependencies.Output('cell_bar_2', 'figure'),
@@ -361,12 +272,12 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
     def update_cell_bar_2(hoverData):
         '''Scatter plot highlighting all features of a selected cell.'''
         recording = hoverData['points'][0]['hoverinfo']
-        features_scaled = cells_adapt_scaled[cells_ap.recording == recording][0][feature_order_hclust]
-        features_raw = cells_adapt_arr_raw[cells_ap.recording == recording][0][feature_order_hclust]
-        features_name = cells_adapt_features.columns[feature_order_hclust]
+        cells_selected_scaled = cells_features_raw_scaled[cells_ap.recording == recording].values[0][feature_order_hclust]
+        cells_selected_raw = cells_features_raw[cells_ap.recording == recording].values[0][feature_order_hclust]
+        features_name = np.array(features_raw)[feature_order_hclust]
 
         background = [go.Scatter(
-            x=cells_adapt_scaled[i][feature_order_hclust],
+            x=cells_features_raw_scaled.iloc[i, :][feature_order_hclust],
             y=features_name,
             #orientation = 'h',
             mode='markers+lines',
@@ -383,14 +294,14 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
             ),
             opacity=0.2,
             hoverinfo='none'
-        ) for i in range(len(cells_adapt_features))]
+        ) for i in range(len(cells_features_raw_scaled))]
 
         hightlight = go.Scatter(
-            x=features_scaled,
+            x=cells_selected_scaled,
             y=features_name,
             #orientation = 'h',
             mode='markers+lines+text',
-            text=[feature_names[y] for y in features_name],
+            text=[feature_name_dict[y] for y in features_name],
             textposition='right',
             line=dict(
                 color=muted['green'],
@@ -408,11 +319,11 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
         )
 
         hightlight_2 = go.Scatter(
-            x=features_scaled,
+            x=cells_selected_scaled,
             y=features_name,
             #orientation = 'h',
             mode='markers+text',
-            text=[format(x, '.3g') for x in features_raw],
+            text=[format(x, '.3g') for x in cells_selected_raw],
             textposition='left',
             marker=dict(
                 size=15,
@@ -445,7 +356,3 @@ def iclamp_viz(unique_isteps=unique_isteps, plot_paths=plot_paths):
 
     #app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
     return app
-
-if __name__ == '__main__':
-    app = iclamp_viz()
-    app.run_server(host='0.0.0.0', port=1235, debug=True)

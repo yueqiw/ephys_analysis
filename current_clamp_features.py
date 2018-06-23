@@ -6,26 +6,15 @@ from allensdk_0_14_2 import ephys_extractor as efex
 from allensdk_0_14_2 import ephys_features as ft
 
 
-feature_name_dict = dict(input_resistance='Input Resistance (MOhm)',
-                     sag='Sag',
-                     capacitance='Membrane Capacitance (pF)',
-                     v_rest='Resting Vm (mV)',
-                    f_i_curve_slope='F-I Curve Slope',
-                    ap_threshold='Spike threshold (mV)',
-                    ap_width='Spike Width (ms)',
-                    ap_peak_to_threshold='Spike Amplitude (mV)',
-                    ap_trough_to_threshold='AHP Amplitude (mV)',
-                    ap_upstroke='Spike Upstroke (mV/ms)',
-                    ap_updownstroke_ratio='Upstroke-Downstroke Ratio',
-                    adapt_avg='Adaptation Index',
-                    vm_for_sag='Vm for Sag (mV)')
-
 def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthres_sweeps = 4,
-                            sag_target = -100, hero_delta_mV = 10,
-                            filter=10., dv_cutoff=5., max_interval=0.02, min_height=5.,
+                            sag_target = -100, suprathreshold_target_delta_v = 15,
+                            suprathreshold_target_delta_i = 15,
+                            latency_target_delta_i = 5,
+                            filter=10., dv_cutoff=5., max_interval=0.02, min_height=10,
                             min_peak=-20., thresh_frac=0.05, baseline_interval=0.1,
                             baseline_detect_thresh = 0.3, spike_detection_delay=0.001,
-                            adapt_avg_n_sweeps=3, adapt_first_n_ratios=2):
+                            adapt_avg_n_sweeps=3, adapt_first_n_ratios=2,
+                            sag_range_left=-120, sag_range_right=-95):
 
     '''
     Compute the cellular ephys features from square pulse current injections.
@@ -56,7 +45,8 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
     fex = efex.EphysCellFeatureExtractor(None, None, istep_ext,
                                             subthresh_min_amp=subthresh_min_amp,
                                             n_subthres_sweeps=n_subthres_sweeps,
-                                            sag_target=sag_target)
+                                            sag_target=sag_target,
+                                            sag_range=[sag_range_left, sag_range_right])
     fex.process(keys = "long_squares")
 
     # To make dict-conversion work
@@ -68,7 +58,7 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
 
     # find hero sweep for AP train
     # target hero sweep as the first sweep with current amplitude > min threshold_v
-    # min threshold is the rheobase + current to increase Vm by 10 mV (10 mV / input_r)
+    # min threshold is the rheobase + current to increase Vm by 15 mV (15 mV / input_r)
     if cell_features['rheobase_i'] is None:
         has_AP = False
         hero_sweep = None
@@ -77,29 +67,85 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
         rheo_amp = cell_features['rheobase_i']
         input_r = cell_features['input_resistance']
 
-        hero_stim_min = rheo_amp + hero_delta_mV / input_r * 1000
-        # print(rheo_amp, hero_delta_mV / input_r * 1000, hero_stim_min)  # DEBUG
+        # hero_stim_target = rheo_amp + suprathreshold_target_delta_v / input_r * 1000
+        hero_stim_target = rheo_amp + suprathreshold_target_delta_i - 1
+        latency_stim_target = rheo_amp + 5
+        # print(rheo_amp, hero_stim_target)
+        # print(rheo_amp, hero_delta_mV / input_r * 1000, hero_stim_target)  # DEBUG
         hero_amp = float("inf")
         hero_sweep = None
 
-        for sweep in fex.long_squares_features("spiking").sweeps():
+        latency_amp = float("inf")
+        latency_sweep = None
+
+        all_spiking_sweeps = sorted(fex.long_squares_features("spiking").sweeps(), key=lambda x: x.sweep_feature("stim_amp"))
+        for sweep in all_spiking_sweeps:
             nspikes = len(sweep.spikes())
             amp = sweep.sweep_feature("stim_amp")
             # print(amp, sweep.sweep_feature("i_baseline"))  # DEBUG
+            # print(amp)
+            if nspikes > 0:
+                if amp > hero_stim_target and amp < hero_amp:
+                    hero_amp = amp
+                    hero_sweep = sweep
+                    pre_hero_amp = last_amp
+                    pre_hero_sweep = last_sweep
+                    break
+                last_sweep = sweep
+                last_amp = amp
 
-            if nspikes > 0 and amp > hero_stim_min and amp < hero_amp:
-                hero_amp = amp
-                hero_sweep = sweep
+        for sweep in all_spiking_sweeps:
+            nspikes = len(sweep.spikes())
+            amp = sweep.sweep_feature("stim_amp")
+            if nspikes > 0:
+                if amp > latency_stim_target:
+                    latency_amp = amp
+                    latency_sweep = sweep
+                    pre_latency_amp = last_latency_amp
+                    pre_latency_sweep = last_latency_sweep
+                    break
+                last_latency_sweep = sweep
+                last_latency_amp = amp
 
-    if hero_sweep:
-        adapt = hero_sweep.sweep_feature("adapt")
-        latency = hero_sweep.sweep_feature("latency")
-        median_isi = hero_sweep.sweep_feature("median_isi")
-        mean_rate = hero_sweep.sweep_feature("avg_rate")
-    else:
-        print("Could not find hero sweep.")
+        # print(hero_amp)
+
+    if has_AP:
+        if hero_sweep:
+            adapt = hero_sweep.sweep_feature("adapt")
+            hs_latency = hero_sweep.sweep_feature("latency")
+            pre_hs_latency = pre_hero_sweep.sweep_feature("latency")
+            median_isi = hero_sweep.sweep_feature("median_isi")
+            hs_rate = hero_sweep.sweep_feature("avg_rate")
+            pre_hs_rate = pre_hero_sweep.sweep_feature("avg_rate")
+
+            avg_hs_latency = ((hero_amp - hero_stim_target) * pre_hs_latency + \
+                          (hero_stim_target - pre_hero_amp) * hs_latency) / (hero_amp - pre_hero_amp)
+            # print(hero_amp, hero_stim_target, pre_hero_amp)
+            # print(hs_latency, avg_latency, pre_hs_latency)
+            avg_rate = ((hero_amp - hero_stim_target) * pre_hs_rate + \
+                          (hero_stim_target - pre_hero_amp) * hs_rate) / (hero_amp - pre_hero_amp)
+        else:
+            avg_hs_latency = last_sweep.sweep_feature("latency")
+            avg_rate = last_sweep.sweep_feature("avg_rate")
+            print("Could not find hero sweep.")
+
+        if latency_sweep:
+            latency_above = latency_sweep.sweep_feature("latency")
+            latency_below = pre_latency_sweep.sweep_feature("latency")
+
+            avg_rheobase_latency = ((latency_amp - latency_stim_target) * latency_below + \
+                          (latency_stim_target - pre_latency_amp) * latency_above) / (latency_amp - pre_latency_amp)
+            # print(hero_amp, hero_stim_target, pre_hero_amp)
+
+        else:
+            avg_rheobase_latency = last_latency_sweep.sweep_feature("latency")
+
+        #print(latency_below, avg_rheobase_latency, latency_above)
+
+
 
     first_spike = cell_features['rheobase_sweep']['spikes'][0] if has_AP else {}
+    cell_features['hero_sweep_stim_target'] = hero_stim_target if hero_sweep else None
     cell_features['hero_sweep'] = hero_sweep.as_dict() if hero_sweep else {}
     cell_features['hero_sweep_stim_amp'] = cell_features['hero_sweep']['stim_amp'] if hero_sweep else None
     cell_features['hero_sweep_index'] = cell_features['hero_sweep']['id'] if hero_sweep else None
@@ -111,7 +157,8 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
 
     spikes_peak_t = np.array([spike['peak_t'] for spike in all_spikes])
     adapt_avg, adapt_all = calculate_adapt(spikes_sweep_id, spikes_peak_t, start,
-                                    adapt_interval=1.0, max_isi_ratio=3,
+                                    adapt_interval=1.0, max_isi_ratio=2.5,
+                                    min_peaks=4,
                                     avg_n_sweeps=adapt_avg_n_sweeps,
                                     first_n_adapt_ratios=adapt_first_n_ratios)
     # print(adapt_avg)
@@ -141,16 +188,27 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
                         ('ap_peak', first_spike.get('peak_v')),
 
                         ('ap_trough', first_spike.get('trough_v')),
+                        ('ap_fast_trough', first_spike.get('fast_trough_v')),
+                        ('ap_slow_trough', first_spike.get('slow_trough_v')),
+                        ('ap_adp', first_spike.get('adp_v')),
+                        ('ap_trough_3w', first_spike.get('trough_3w_v')),
+                        ('ap_trough_4w', first_spike.get('trough_4w_v')),
+                        ('ap_trough_5w', first_spike.get('trough_5w_v')),
                         ('ap_trough_to_threshold', first_spike['threshold_v'] - first_spike['trough_v'] if has_AP else None),
+                        ('ap_trough_4w_to_threshold', first_spike['threshold_v'] - first_spike['trough_4w_v'] if has_AP else None),
+                        ('ap_trough_5w_to_threshold', first_spike['threshold_v'] - first_spike['trough_5w_v'] if has_AP else None),
                         ('ap_peak_to_threshold', first_spike['peak_v'] - first_spike['threshold_v'] if has_AP else None),
                         ('ap_upstroke',first_spike.get('upstroke')),
                         ('ap_downstroke', - first_spike.get('downstroke') if has_AP else None),  # make it positive
                         ('ap_updownstroke_ratio', first_spike.get('upstroke_downstroke_ratio')),
 
-                        ('hs_firing_rate' , mean_rate if hero_sweep else None),
+                        ('hs_firing_rate' , hs_rate if hero_sweep else None),
+                        ('avg_firing_rate' , avg_rate if has_AP else None),
                         ('hs_adaptation' , adapt if hero_sweep else None),
                         ('hs_median_isi' , median_isi if hero_sweep else None),
-                        ('hs_latency' , latency * 1000 if hero_sweep else None),
+                        ('hs_latency' , hs_latency * 1000 if hero_sweep else None),
+                        ('avg_hs_latency' , avg_hs_latency * 1000 if has_AP else None),
+                        ('avg_rheobase_latency' , avg_rheobase_latency * 1000 if has_AP else None),
 
                         ('rheobase_index', cell_features['rheobase_extractor_index']),
                         ('rheobase_stim_amp', cell_features['rheobase_i']),
@@ -173,6 +231,19 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
                         ('spikes_threshold_v', np.array([spike['threshold_v'] for spike in all_spikes])),
                         ('spikes_peak_v', np.array([spike['peak_v'] for spike in all_spikes])),
                         ('spikes_trough_v', np.array([spike['trough_v'] for spike in all_spikes])),
+
+                        ('spikes_fast_trough_t', np.array([spike['fast_trough_t'] for spike in all_spikes])),
+                        ('spikes_fast_trough_v', np.array([spike['fast_trough_v'] for spike in all_spikes])),
+                        ('spikes_slow_trough_t', np.array([spike['slow_trough_t'] for spike in all_spikes])),
+                        ('spikes_slow_trough_v', np.array([spike['slow_trough_v'] for spike in all_spikes])),
+                        ('spikes_adp_t', np.array([spike['adp_t'] for spike in all_spikes])),
+                        ('spikes_adp_v', np.array([spike['adp_v'] for spike in all_spikes])),
+                        ('spikes_trough_3w_t', np.array([spike['trough_3w_t'] for spike in all_spikes])),
+                        ('spikes_trough_3w_v', np.array([spike['trough_3w_v'] for spike in all_spikes])),
+                        ('spikes_trough_4w_t', np.array([spike['trough_4w_t'] for spike in all_spikes])),
+                        ('spikes_trough_4w_v', np.array([spike['trough_4w_v'] for spike in all_spikes])),
+                        ('spikes_trough_5w_t', np.array([spike['trough_5w_t'] for spike in all_spikes])),
+                        ('spikes_trough_5w_v', np.array([spike['trough_5w_v'] for spike in all_spikes])),
                         ('adapt_avg', adapt_avg)
 
     ])
@@ -181,12 +252,13 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
 
 
 def calculate_adapt(spikes_sweep_id, spikes_peak_t, start, end=None, adapt_interval=1.0,
-                    min_peaks=3, max_isi_ratio=3, avg_n_sweeps=3, first_n_adapt_ratios=None,
+                    min_peaks=4, max_isi_ratio=2.5, avg_n_sweeps=3, first_n_adapt_ratios=None,
                     firing_rate_target=None):
     '''
     parameters
     ----------
-    max_isi_ratio: filter out long gaps .
+    max_isi_ratio: filter out long gaps.
+    min_peaks: only use sweeps with at least 4 peaks (3 isi's, or 2 adapt ratios).
     avg_n_sweeps: use the first n sweeps that satisfy all constraints to calculate average adaptation ratio.
     first_n_adapt_ratios: for each sweep, only take the first n adaptation ratios for averaging.
                 Setting this to None then uses all adaptation ratios from the sweep.
@@ -206,7 +278,7 @@ def calculate_adapt(spikes_sweep_id, spikes_peak_t, start, end=None, adapt_inter
         else:
             peaks[k] = [v]
 
-    # delete sweeps with <3 spikes
+    # delete sweeps with < 4 spikes
     to_pop = []
     for k in peaks:
         if len(peaks[k]) < min_peaks:
@@ -227,11 +299,14 @@ def calculate_adapt(spikes_sweep_id, spikes_peak_t, start, end=None, adapt_inter
             if v[i] > v[i-1] * max_isi_ratio:
                 isi[k] = v[:i]
                 break
+            elif v[i-1] > v[i] * max_isi_ratio:
+                isi[k] = v[:i-1]
+                break
 
-    # delete sweeps with <2 isi's
+    # delete sweeps with <3 isi's
     to_pop = []
     for k in isi:
-        if len(isi[k]) < 2:
+        if len(isi[k]) < min_peaks - 1:
             to_pop.append(k)
     for k in to_pop:
         isi.pop(k)

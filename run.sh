@@ -1,2 +1,2 @@
 #!/bin/bash
-python ./visualization/iclamp_app.py
+python run_viz.py

@@ -22,9 +22,7 @@ from .feature_annotations import *
 def iclamp_viz(input_data, plot_paths, data_root_dir):
     app = dash.Dash()
 
-    # subset cells with and without action potentials
-    cells_ap = input_data.loc[(input_data['has_ap'] == 'Yes'),:].copy()
-
+    cells_ap = input_data.copy()
     # select useful features
 
     features_pca = features_noAP + features_ap # adapt_avg has missing data, cannot use for pca
@@ -44,11 +42,12 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
 
     # generate cluster heatmap using Seaborn
     k_cluster = 5
+    color_seed = 1
     with sns.axes_style(None, {'axes.facecolor':'#e5e5e5'}):
         g, hclust_labels = cluster_heatmap(data_df=cells_ap[features_cluster], feature_name_dict=feature_name_dict,
                         categorical_df=cells_ap, categories=['cluster', 'strain'], k_cluster=k_cluster,
                         method='average', metric='correlation', row_cluster=True, mask=None,
-                        caterogy_color_l=0.65, caterogy_color_s=[0.65, 0.4, 0.5], color_seed=1)
+                        caterogy_color_l=0.65, caterogy_color_s=[0.65, 0.4, 0.5], color_seed=color_seed)
 
     cells_ap['cluster'] = hclust_labels
     feature_order_hclust = g.dendrogram_row.reordered_ind[::-1]
@@ -85,12 +84,12 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
             html.Div([
 
                 dcc.RadioItems(
-                    id='png_gif',
+                    id='animated',
                     options=[
-                        {'label': 'PNG ', 'value': 'png'},
-                        {'label': 'GIF ', 'value': 'gif'},
+                        {'label': 'Static ', 'value': 'static'},
+                        {'label': 'Animated ', 'value': 'animated'},
                     ],
-                    value='gif',
+                    value='animated',
                     labelStyle={'display': 'inline-block'}
                 )
             ], style={'width': '45%', 'display': 'inline-block'})
@@ -106,9 +105,9 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
                         style={'height': '100%'})
                 ], style={'width': '10%', 'height': '100%', 'display': 'inline-block'}),
             html.Div([
-                html.Img(id='isteps', src='',
+                html.Video(id='isteps', src='', autoPlay=True, loop=True, controls=False, preload=True, muted=True, poster='',
                         style={'height': '100%'})
-                ], style={'width': '30%', 'height': '100%', 'display': 'inline-block'}),
+                ], id='isteps_div', style={'width': '30%', 'height': '100%', 'display': 'inline-block'}),
             html.Div([
                 dcc.Graph(id='cell_bar_2',
                         style={'height': '100%'})
@@ -166,7 +165,7 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
                    for a,b,c in cells_pca_minmax[:,:3]]
         elif feature in metadata_in_dropdown:
             color = ['rgba(' + str(a-0.001) + ', ' + str(b-0.001) + ', ' + str(c-0.001) + ')' \
-                   for a,b,c in categorical_color_mapping(cells_ap[feature])[0]]
+                   for a,b,c in categorical_color_mapping(cells_ap[feature], seed=color_seed)[0]]
             print(color)
         elif feature in features_pca:
             i = list(features_pca).index(feature)
@@ -216,27 +215,31 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
 
 
     @app.callback(
-        dash.dependencies.Output('isteps', 'src'),
+        dash.dependencies.Output('isteps_div', 'children'),
         [dash.dependencies.Input('cell_pca_3d', 'hoverData'),
-        dash.dependencies.Input('png_gif', 'value')])
-    def update_istep_plots(hoverData, png_gif):
+        dash.dependencies.Input('animated', 'value')])
+    def update_img_vs_animation(hoverData, animated):
         '''show all traces of current injection and membrane voltage for a selected cell_pca_3d
         Inputs:
-            png_gif: either static png or animated gif
+            animated: either static png or animated mp4/gif
         '''
         recording = hoverData['points'][0]['hoverinfo']
         plot_paths_row = plot_paths[plot_paths.recording == recording]
-
-        if png_gif == 'gif' and type(plot_paths_row['istep_gif_path'].item()) is str:
-            gif_path = os.path.join(data_root_dir, plot_paths_row['istep_gif_path'].item())
+        if animated == 'animated' and type(plot_paths_row['istep_mp4_path'].item()) is str:
+            gif_path = os.path.join(data_root_dir, plot_paths_row['istep_mp4_path'].item())
             encoded_img = base64.b64encode(open(gif_path, 'rb').read())
-            decoded_img = 'data:image/gif;base64,{}'.format(encoded_img.decode())
+            decoded_img = 'data:video/mp4;base64,{}'.format(encoded_img.decode())
+            children = [html.Video(id='isteps', src=decoded_img, autoPlay=True, loop=True,
+                    controls=False, preload=True, muted=True, poster='',
+                    style={'height': '100%'})]
         else:
             png_path = os.path.join(data_root_dir, plot_paths_row['istep_png_mid_path'].item())
             encoded_img = base64.b64encode(open(png_path, 'rb').read())
             decoded_img = 'data:image/png;base64,{}'.format(encoded_img.decode())
+            children = [html.Img(id='isteps', src=decoded_img,
+                    style={'height': '100%'})]
+        return children
 
-        return decoded_img
 
     @app.callback(
         dash.dependencies.Output('fi_spike_phase', 'src'),

@@ -239,14 +239,15 @@ def animate_current_step(data, fig_height=6, x_scale=3.5, xlim=[0.3,3.2],
              axes[0].plot(spikes, np.ones_like(spikes) * i, marker='o', markersize=size, ls='', color=color, alpha=alpha)
 
     axes[-2].set_ylim(vlim)
-    axes[-2].set_ylabel('Membrane Voltage (mV)')
+    axes[-2].set_ylabel('Membrane Voltage (mV)', fontsize=16)
     axes[-2].set_xticklabels([])
     axes[-1].set_ylim(ilim)
-    axes[-1].set_ylabel('Current (pA)')
-    axes[-1].set_xlabel('Time (s)')
+    axes[-1].set_ylabel('Current (pA)', fontsize=16)
+    axes[-1].set_xlabel('Time (s)', fontsize=16)
     if n_plots == 3:
         axes[0].set_ylim([1, data['n_sweeps']])
         axes[0].set_xticklabels([])
+        axes[0].set_ylabel('Sweeps', fontsize=16)
     for ax in axes:
         ax.set_xlim(xlim)
         ax.yaxis.set_label_coords(-0.64/figsize[0],0.5)

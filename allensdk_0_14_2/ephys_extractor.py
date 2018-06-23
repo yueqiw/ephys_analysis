@@ -146,6 +146,9 @@ class EphysSweepFeatureExtractor:
                                                             self.filter, dvdt=dvdt)
         widths = ft.find_widths(v, t, thresholds, peaks, trough_details[1], clipped)
         #print(thresholds, peaks, upstrokes, clipped)
+        trough_3w = ft.find_alternative_trough_indexes(v, t, thresholds, peaks, widths, 3, clipped, self.end)
+        trough_4w = ft.find_alternative_trough_indexes(v, t, thresholds, peaks, widths, 4, clipped, self.end)
+        trough_5w = ft.find_alternative_trough_indexes(v, t, thresholds, peaks, widths, 5, clipped, self.end)
         base_clipped_list = []
 
         # Points where we care about t, v, and i if available
@@ -153,8 +156,11 @@ class EphysSweepFeatureExtractor:
             "threshold": thresholds,
             "peak": peaks,
             "trough": troughs,
+            "trough_3w": trough_3w,
+            "trough_4w": trough_4w,
+            "trough_5w": trough_5w,
         }
-        base_clipped_list += ["trough"]
+        base_clipped_list += ["trough", "trough_3w", "trough_4w", "trough_5w"]
 
         # Points where we care about t and dv/dt
         dvdt_data_indexes = {
@@ -790,7 +796,8 @@ class EphysCellFeatureExtractor:
     SUBTHRESH_MAX_AMP = 0
 
     def __init__(self, ramps_ext, short_squares_ext, long_squares_ext,
-                 subthresh_min_amp=-100, n_subthres_sweeps=4, sag_target = -100.):
+                 subthresh_min_amp=-100, n_subthres_sweeps=4, sag_target = -100.,
+                 sag_range=[-115, -95]):
         """Initialize EphysCellFeatureExtractor object from EphysSweepSetExtractors for
         ramp, short square, and long square sweeps.
 
@@ -809,6 +816,7 @@ class EphysCellFeatureExtractor:
         self._subthresh_min_amp = subthresh_min_amp
         self._n_subthres_sweeps = n_subthres_sweeps
         self._sag_target = sag_target
+        self._sag_range = sag_range
 
         self._features = {
             "ramps": {},
@@ -944,9 +952,18 @@ class EphysCellFeatureExtractor:
         sags = subthresh_ext.sweep_features("sag")
         sag_eval_levels = np.array([sweep.voltage_deflection(peak_range=0.5)[0] for sweep in subthresh_ext.sweeps()])
         sag_eval_indices = np.array([sweep.voltage_deflection(peak_range=0.5)[1] for sweep in subthresh_ext.sweeps()])
-        target_level = self._sag_target
+
+        # only consider sag sweeps within certain voltage range
+        sag_range_mask = np.logical_and(sag_eval_levels > self._sag_range[0], sag_eval_levels < self._sag_range[1])
+        if not np.any(sag_range_mask):
+            sag_range_mask[np.argmin(sag_eval_levels)] = True
+        # print(sag_eval_levels)
+
         # use the two sweeps closest to the target level to calculate Sag
-        closest_index = np.argsort(np.abs(sag_eval_levels - target_level))[:2]
+        sorted_indices = np.argsort(np.abs(sag_eval_levels - self._sag_target))
+        closest_index = np.array([idx for idx in sorted_indices if sag_range_mask[idx]], dtype=np.int64)[:2]
+        closest_index = np.sort(closest_index)
+        #print(closest_index)
         self._features["long_squares"]["sag"] = np.mean(sags[closest_index])
         self._features["long_squares"]["sag_sweeps"] = closest_index
         self._features["long_squares"]["indices_for_sag"] = sag_eval_indices[closest_index]

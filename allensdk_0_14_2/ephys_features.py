@@ -397,6 +397,66 @@ def find_trough_indexes(v, t, spike_indexes, peak_indexes, clipped=None, end=Non
     return trough_indexes
 
 
+
+def find_alternative_trough_indexes(v, t, spike_indexes, peak_indexes, widths, n_widths, clipped=None, end=None):
+    """
+    Find indexes of minimum voltage (trough) between spikes.
+    Find the trough within n times of spike width from the peak
+
+    Parameters
+    ----------
+    v : numpy array of voltage time series in mV
+    t : numpy array of times in seconds
+    spike_indexes : numpy array of spike indexes
+    peak_indexes : numpy array of spike peak indexes
+    end : end of time window (optional)
+
+    Returns
+    -------
+    trough_indexes : numpy array of threshold indexes
+    """
+
+    if not spike_indexes.size or not peak_indexes.size:
+        return np.array([])
+
+    if clipped is None:
+        clipped = np.zeros_like(spike_indexes, dtype=bool)
+
+    if end is None:
+        end = t[-1]
+    end_index = find_time_index(t, end)
+
+    clipped_all = np.logical_or(clipped, np.isnan(widths))
+
+    valid_peak_indexes = peak_indexes[~clipped_all].astype(int)
+    valid_spike_indexes = spike_indexes[~clipped_all].astype(int)
+    valid_widths = widths[~clipped_all]
+    trough_indexes = np.zeros_like(spike_indexes, dtype=float) * np.nan
+    trough_index_values = np.zeros_like(valid_spike_indexes, dtype=float)
+
+    # print(widths[:-1])
+    # print(spike_indexes)
+    #print([(t[spk], t[peak], width, width * n_widths) for peak, spk, width in zip(peak_indexes[:-1], spike_indexes[1:], widths)])
+    trough_index_values[:-1] = [v[peak:spk].argmin() + peak
+                           if t[spk] - t[peak] <= width * n_widths
+                           else v[peak:(peak + find_time_index(t[peak:spk], t[peak] + width * n_widths))].argmin() + peak
+                           for peak, spk, width in zip(valid_peak_indexes[:-1], valid_spike_indexes[1:], valid_widths[:-1])]
+    if len(valid_peak_indexes) > 0:
+        peak = valid_peak_indexes[-1]
+        # print(widths)
+        # print(clipped_all)
+        # print(valid_widths)
+        # print(t[peak], t[end_index], valid_widths[-1], valid_widths[-1] * n_widths)
+        trough_index_values[-1] = v[peak:end_index].argmin() + peak \
+                             if t[end_index] - t[peak] <= valid_widths[-1] * n_widths \
+                             else v[peak:(peak + find_time_index(t[peak:end_index], t[peak] + valid_widths[-1] * n_widths))].argmin() + peak
+
+    trough_indexes[~clipped_all] = trough_index_values
+
+    return trough_indexes
+
+
+
 def find_downstroke_indexes(v, t, peak_indexes, trough_indexes, clipped=None, filter=10., dvdt=None):
     """Find indexes of minimum voltage (troughs) between spikes.
 
@@ -470,19 +530,23 @@ def find_widths(v, t, spike_indexes, peak_indexes, trough_indexes, clipped=None)
     use_indexes = ~np.isnan(trough_indexes)
     use_indexes[clipped] = False
 
+    # CHANGE: use threshold-to-peak has height. width level = 0.5 (peak - threshold) + threshold
+    # the allensdk originally use height = peak - through, which is not a widely used metric.
     heights = np.zeros_like(trough_indexes) * np.nan
-    heights[use_indexes] = v[peak_indexes[use_indexes]] - v[trough_indexes[use_indexes].astype(int)]
+    # heights[use_indexes] = v[peak_indexes[use_indexes]] - v[trough_indexes[use_indexes].astype(int)]
+    heights[use_indexes] = v[peak_indexes[use_indexes]] - v[spike_indexes[use_indexes].astype(int)]
 
     width_levels = np.zeros_like(trough_indexes) * np.nan
-    width_levels[use_indexes] = heights[use_indexes] / 2. + v[trough_indexes[use_indexes].astype(int)]
+    # width_levels[use_indexes] = heights[use_indexes] / 2. + v[trough_indexes[use_indexes].astype(int)]
+    width_levels[use_indexes] = heights[use_indexes] / 2. + v[spike_indexes[use_indexes].astype(int)]
 
-    thresh_to_peak_levels = np.zeros_like(trough_indexes) * np.nan
-    thresh_to_peak_levels[use_indexes] = (v[peak_indexes[use_indexes]] - v[spike_indexes[use_indexes]]) / 2. + v[spike_indexes[use_indexes]]
+    # thresh_to_peak_levels = np.zeros_like(trough_indexes) * np.nan
+    # thresh_to_peak_levels[use_indexes] = (v[peak_indexes[use_indexes]] - v[spike_indexes[use_indexes]]) / 2. + v[spike_indexes[use_indexes]]
 
     # Some spikes in burst may have deep trough but short height, so can't use same
     # definition for width
-    width_levels[width_levels < v[spike_indexes]] = \
-        thresh_to_peak_levels[width_levels < v[spike_indexes]]
+    # width_levels[width_levels < v[spike_indexes]] = \
+    #     thresh_to_peak_levels[width_levels < v[spike_indexes]]
 
     width_starts = np.zeros_like(trough_indexes) * np.nan
     width_starts[use_indexes] = np.array([pk - np.flatnonzero(v[pk:spk:-1] <= wl)[0] if
@@ -669,6 +733,8 @@ def calculate_dvdt(v, t, filter=None):
         delta_t = t[1] - t[0]
         sample_freq = 1. / delta_t
         filt_coeff = (filter * 1e3) / (sample_freq / 2.) # filter kHz -> Hz, then get fraction of Nyquist frequency
+        if abs(filt_coeff - 1) < 0.001:  # fix some edge conditions
+            filt_coeff = 1.0
         if filt_coeff < 0 or filt_coeff > 1:
             raise FeatureError("bessel coeff (%f) is outside of valid range [0,1]. cannot compute features." % filt_coeff)
         b, a = signal.bessel(4, filt_coeff, "low")

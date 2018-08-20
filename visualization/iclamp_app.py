@@ -61,7 +61,7 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
                 style={'text-align': 'center', 'font-family':'helvetica', 'font-weight':'normal'}),
         html.Div([
             html.Div([
-                html.H2('Select features to plot on PCA', id='plot_feature',
+                html.H2('Select features to plot', id='plot_feature',
                     style={'text-align': 'center', 'font-family':'helvetica', 'font-weight':'normal'})
             ], style={'width':'42%', 'display': 'inline-block'}),
             html.Div([
@@ -96,8 +96,9 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
         ], style={'width': '100%', 'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'}),
 
         html.Div([
+
             html.Div([
-                dcc.Graph(id='cell_pca_3d', hoverData={'points': [{'hoverinfo': '2017_01_27_0009'}]},
+                dcc.Graph(id='cell_embedding', hoverData={'points': [{'hoverinfo': '2017_01_27_0009'}]},
                         style={'height': '100%'})
                 ], style={'width': '42%', 'height': '100%', 'display': 'inline-block', 'padding': '0 20'}),
             html.Div([
@@ -149,7 +150,7 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
             return feature.title()
 
     @app.callback(
-        dash.dependencies.Output('cell_pca_3d', 'figure'),
+        dash.dependencies.Output('cell_embedding', 'figure'),
         [dash.dependencies.Input('feature_pc', 'value')])
     def update_cell_pca_3d(feature):
         '''draw 3D PCA plot with selected feature'''
@@ -216,10 +217,10 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
 
     @app.callback(
         dash.dependencies.Output('isteps_div', 'children'),
-        [dash.dependencies.Input('cell_pca_3d', 'hoverData'),
+        [dash.dependencies.Input('cell_embedding', 'hoverData'),
         dash.dependencies.Input('animated', 'value')])
     def update_img_vs_animation(hoverData, animated):
-        '''show all traces of current injection and membrane voltage for a selected cell_pca_3d
+        '''show all traces of current injection and membrane voltage for a selected cell_embedding
         Inputs:
             animated: either static png or animated mp4/gif
         '''
@@ -243,7 +244,7 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
 
     @app.callback(
         dash.dependencies.Output('fi_spike_phase', 'src'),
-        [dash.dependencies.Input('cell_pca_3d', 'hoverData')])
+        [dash.dependencies.Input('cell_embedding', 'hoverData')])
     def update_istep_side_plots(hoverData):
         '''show F-I curve, first action potential and phase plane plot.'''
         recording = hoverData['points'][0]['hoverinfo']
@@ -255,7 +256,7 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
 
     @app.callback(
         dash.dependencies.Output('cell_info', 'children'),
-        [dash.dependencies.Input('cell_pca_3d', 'hoverData')])
+        [dash.dependencies.Input('cell_embedding', 'hoverData')])
     def update_cell_info(hoverData):
         '''print the metadata (rerording, date, age, etc) of the selected cell.'''
         # print(hoverData)
@@ -271,7 +272,7 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
 
     @app.callback(
         dash.dependencies.Output('cell_bar_2', 'figure'),
-        [dash.dependencies.Input('cell_pca_3d', 'hoverData')])
+        [dash.dependencies.Input('cell_embedding', 'hoverData')])
     def update_cell_bar_2(hoverData):
         '''Scatter plot highlighting all features of a selected cell.'''
         recording = hoverData['points'][0]['hoverinfo']

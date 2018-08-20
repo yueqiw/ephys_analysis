@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 import allensdk_0_14_2.ephys_features as ft
 
+# TODO: implement plotting functions under a class object 
 
 def load_current_step_add_itrace(abf_file, ihold, istart, istep, startend=None, filetype='abf', channels=[0]):
     '''

@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from collections import OrderedDict
-
+import gc
 from current_clamp import *
 from current_clamp_features import extract_istep_features
 from visualization.feature_annotations import feature_name_dict
@@ -13,6 +13,7 @@ from read_metadata import *
 from file_io import load_current_step
 # from pymysql import IntegrityError
 import datajoint as dj
+
 schema = dj.schema('yueqi_ephys', locals())
 
 FIG_DIR = 'analysis_current_clamp/figures_plot_recording'
@@ -571,6 +572,7 @@ class AnimatedCurrentStepPlots(dj.Imported):
         anim.save(os.path.join(directory, key['istep_gif_path']), writer='imagemagick', fps=2.5, dpi=100)
         anim.save(os.path.join(directory, key['istep_mp4_path']), writer='ffmpeg', fps=2.5, dpi=100)
         plt.close(fig_anim)
+        gc.collect()
 
         self.insert1(row=key)
         return

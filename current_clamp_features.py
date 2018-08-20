@@ -57,8 +57,9 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
     cell_features = cell_features["long_squares"]
 
     # find hero sweep for AP train
-    # target hero sweep as the first sweep with current amplitude > min threshold_v
-    # min threshold is the rheobase + current to increase Vm by 15 mV (15 mV / input_r)
+    # target hero sweep as the first sweep with current amplitude > min threshold_i
+    # min threshold is the rheobase + current
+
     if cell_features['rheobase_i'] is None:
         has_AP = False
         hero_sweep = None
@@ -69,7 +70,7 @@ def extract_istep_features(data, start, end, subthresh_min_amp = -100, n_subthre
 
         # hero_stim_target = rheo_amp + suprathreshold_target_delta_v / input_r * 1000
         hero_stim_target = rheo_amp + suprathreshold_target_delta_i - 1
-        latency_stim_target = rheo_amp + 5
+        latency_stim_target = rheo_amp + latency_target_delta_i
         # print(rheo_amp, hero_stim_target)
         # print(rheo_amp, hero_delta_mV / input_r * 1000, hero_stim_target)  # DEBUG
         hero_amp = float("inf")

@@ -117,20 +117,20 @@ def iclamp_viz(input_data, plot_paths, data_root_dir):
                     'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'}),
 
 
-        html.Div([
-            html.Div([
-                html.H3('Hierarchical clustering heatmap', style={'font-family':'helvetica', 'font-weight':'normal'}),
-                html.Img(id='cell_feature_heatmap', src=decoded_heatmap,
-                        style={'height': '100%'})
-                ], style={'width': '60%', 'height': '100%', 'display': 'inline-block'}),
-            html.Div([
-                # dcc.Graph(id='cell_bar',
-                #         style={'height': '100%'})
-                ], style={'width': '30%', 'height': '130%', 'display': 'inline-block'}),
-            html.Div([], style={'width': '20%', 'height': '100%', 'display': 'inline-block'})
-
-        ], style={'height': '600px', 'width': '100%',
-                    'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'})
+        # html.Div([
+        #     html.Div([
+        #         html.H3('Hierarchical clustering heatmap', style={'font-family':'helvetica', 'font-weight':'normal'}),
+        #         html.Img(id='cell_feature_heatmap', src=decoded_heatmap,
+        #                 style={'height': '100%'})
+        #         ], style={'width': '60%', 'height': '100%', 'display': 'inline-block'}),
+        #     html.Div([
+        #         # dcc.Graph(id='cell_bar',
+        #         #         style={'height': '100%'})
+        #         ], style={'width': '30%', 'height': '130%', 'display': 'inline-block'}),
+        #     html.Div([], style={'width': '20%', 'height': '100%', 'display': 'inline-block'})
+        #
+        # ], style={'height': '600px', 'width': '100%',
+        #             'display': 'flex', 'flex-flow': 'row wrap', 'justify-content': 'center'})
     ], style={'width': '1600px', 'margin':'auto'})
 
 

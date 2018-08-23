@@ -18,8 +18,9 @@ if __name__ == '__main__':
 
     # load data
     # use pre-computed features stored on local drive (fetched from Datajoint.)
-    data_spike = pd.read_excel(os.path.join(args.analysis, 'istep_unique_filtered_spike.xlsx'), index_col=0)
+    data_spike = pd.read_excel(os.path.join(args.analysis, 'organoid_paper_istep_unique_filtered_spike.xlsx'), index_col=0)
     data_spike = data_spike.rename(columns={'recording.1': 'recording'})
     plot_paths = pd.read_csv(os.path.join(args.analysis, 'plot_path.csv'), index_col=0)
-    app = iclamp_viz(input_data=data_spike, plot_paths=plot_paths, data_root_dir=args.data)
+    umap_df = pd.read_csv(os.path.join(args.analysis, 'organoid_paper_umap_data.csv'), index_col=0)
+    app = iclamp_viz(input_data=data_spike, plot_paths=plot_paths, data_root_dir=args.data, umap_df=umap_df)
     app.run_server(host='0.0.0.0', port=1235, debug=True)

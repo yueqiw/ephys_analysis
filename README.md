@@ -2,7 +2,7 @@
   <img src="assets/screen_capture_h400_15fps_171118.gif">
 </p>
 
-### Simple analysis and visualization of patch clamp electrophysiology data in Python
+### Analysis and visualization of patch clamp electrophysiology data in Python
 
 This repo contains code for processing and visualization of current clamp electrophysiology data in Python
 - Extract electrophysiology measurements from current clamp data (pClamp) using [stfio](https://github.com/neurodroid/stimfit) and [AllenSDK](http://alleninstitute.github.io/AllenSDK/)

@@ -1,5 +1,5 @@
 
-import os
+import os, sys
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
@@ -11,8 +11,11 @@ except:
     import pickle
 
 try:
-    import stfio
-    from stfio import StfIOException
+    if sys.version_info >= (3, 0):
+        print("Make sure .abf files are converted to .pkl in Python 2.")
+    else:
+        import stfio
+        from stfio import StfIOException
 except ImportError:
     print("Module stfio is not installed. Make sure .abf files are converted to .pkl in Python 2.")
 

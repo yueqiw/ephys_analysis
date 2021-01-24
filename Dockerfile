@@ -14,7 +14,7 @@ RUN mkdir /app/data
 VOLUME /app/data
 
 
-COPY config.json /app
+COPY config.txt /app
 COPY run.sh /app
 
 CMD /app/run.sh

@@ -37,7 +37,7 @@ class EphysExperimentsForAnalysis(dj.Manual):
     directory: varchar(256)     # the parent project directory
     """
 
-    def insert_experiment(self, excel_file):
+    def insert_experiment(self, excel_file, replace=False):
         '''
         Insert new sample ephys metadata from excel to datajoint tables
         '''
@@ -47,7 +47,10 @@ class EphysExperimentsForAnalysis(dj.Manual):
         for entry in entry_list:
             if entry['use'] == 'No':
                 continue
-            self.insert1(row=entry, skip_duplicates=True)
+            skip_duplicates = True
+            if replace:
+                skip_duplicates = False
+            self.insert1(row=entry, skip_duplicates=skip_duplicates, replace=replace)
             no_insert = False
             #print("Inserted: " + str(entry))
         if no_insert:

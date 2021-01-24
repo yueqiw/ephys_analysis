@@ -66,7 +66,7 @@ def iclamp_viz(input_data, plot_paths, data_root_dir, umap_df):
 
     # app layout
     app.layout = html.Div([
-        html.H1('Electrophysiological Analysis of Human Cortical Organoids',
+        html.H1('Electrophysiological Recordings in Human Brain Organoids',
                 style={'text-align': 'center', 'font-family':'helvetica', 'font-weight':'normal'}),
         html.Div([
             html.Div([
@@ -338,8 +338,8 @@ def iclamp_viz(input_data, plot_paths, data_root_dir, umap_df):
         #idx = cell_info.index[0]
         #print(cell_info[['date', 'strain', 'cell', 'recording']])
         # -- Index: {}
-        return 'Date: {} -- Strain: {}  --  Recording: {} ' \
-            .format(list(cell_info['date'])[0].strftime("%Y-%m-%d"), *[list(cell_info[x])[0] for x in ['strain', 'recording']])
+        return 'Strain: {}  --  Recording: {} ' \
+            .format(*[list(cell_info[x])[0] for x in ['strain', 'recording']])
 
 
     @app.callback(

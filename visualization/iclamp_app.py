@@ -14,10 +14,26 @@ import pandas as pd
 import seaborn as sns
 import os
 
+import base64
+
 import random
 
-from .viz_utils import *
+# from .viz_utils import *
 from .feature_annotations import *
+
+metadata_in_dropdown = ['experiment', 'strain', 'cluster']
+
+muted = {name: 'rgba(' + str(a) + ', ' + str(b) + ', ' + str(c) + ')' for name, (a, b, c) \
+    in zip(['blue', 'green', 'red', 'purple', 'yellow', 'cyan'], sns.color_palette("muted"))}
+
+def categorical_color_mapping(data, l=0.7, s=0.7, seed=0):
+    categories = np.unique(data)
+    colors = sns.hls_palette(len(categories), l=l, s=s)
+    random.seed(seed)
+    colors = random.sample(colors, len(colors), )
+    lut = dict(zip(categories, colors))
+    cat_color_mapping = data.map(lut)
+    return cat_color_mapping, lut
 
 def iclamp_viz(input_data, plot_paths, data_root_dir, umap_df):
     app = dash.Dash()

@@ -19,7 +19,7 @@ jupyter-core==4.4.0
 MarkupSafe==1.0
 matplotlib==2.1.2
 nbformat==4.4.0
-numpy==1.14.0
+numpy==1.22.0
 pandas==0.22.0
 plotly==2.3.0
 pyparsing==2.2.0

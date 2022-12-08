@@ -1,5 +1,5 @@
 backcall==0.1.0
-certifi==2018.1.18
+certifi==2022.12.7
 cycler==0.10.0
 datajoint==0.10.0
 decorator==4.2.1
